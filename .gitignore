@@ -43,3 +43,31 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Tambahkan ini di bagian Flutter/Dart
+.flutter-plugins
+.packages
+
+# Tambahkan ini di bagian Android (Sangat Penting!)
+# local.properties berisi path SDK di laptopmu, kalau di-upload bakal bikin build error di laptop lain
+**/android/local.properties
+**/android/key.properties
+**/*.keystore
+**/*.jks
+
+# Tambahkan ini di bagian iOS (Penting untuk Apple Dev Academy)
+**/ios/Flutter/Generated.xcconfig
+**/ios/Flutter/flutter_export_environment.sh
+**/ios/Pods/
+**/ios/.generated_files/
+
+# Firebase
+**/android/app/google-services.json
+**/ios/Runner/GoogleService-Info.plist
+**/ios/Firebase/
+.firebaserc
+firebase-debug.log
+*ui-debug.log
+
+# Jika kamu menggunakan FlutterFire CLI
+lib/firebase_options.dart
