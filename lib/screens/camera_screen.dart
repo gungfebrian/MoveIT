@@ -1,0 +1,863 @@
+import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
+import 'package:camera/camera.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
+import '../services/settings_service.dart';
+import 'dart:math' as math;
+
+class CameraScreen extends StatefulWidget {
+  final CameraDescription camera;
+
+  const CameraScreen({super.key, required this.camera});
+
+  @override
+  State<CameraScreen> createState() => _CameraScreenState();
+}
+
+class PosePainter extends CustomPainter {
+  final Pose pose;
+  final Size imageSize;
+  final Size screenSize;
+  final CameraLensDirection cameraLensDirection;
+
+  PosePainter({
+    required this.pose,
+    required this.imageSize,
+    required this.screenSize,
+    required this.cameraLensDirection,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    double scaleX = screenSize.width / imageSize.width;
+    double scaleY = screenSize.height / imageSize.height;
+
+    double translateX(double x) {
+      double mapped = x * scaleX;
+      return cameraLensDirection == CameraLensDirection.front
+          ? screenSize.width - mapped
+          : mapped;
+    }
+
+    double translateY(double y) {
+      return y * scaleY;
+    }
+
+    void drawLine(PoseLandmark? start, PoseLandmark? end, Color color) {
+      if (start == null || end == null) return;
+
+      final linePaint = Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 5.0
+        ..color = color;
+
+      final startX = translateX(start.x);
+      final startY = translateY(start.y);
+      final endX = translateX(end.x);
+      final endY = translateY(end.y);
+
+      canvas.drawLine(Offset(startX, startY), Offset(endX, endY), linePaint);
+    }
+
+    void drawPoint(PoseLandmark? landmark, Color color) {
+      if (landmark == null) return;
+
+      final pointPaintColored = Paint()
+        ..style = PaintingStyle.fill
+        ..color = color;
+
+      final x = translateX(landmark.x);
+      final y = translateY(landmark.y);
+
+      canvas.drawCircle(Offset(x, y), 12, pointPaintColored);
+
+      // Draw white border
+      final borderPaint = Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2.0
+        ..color = Colors.white;
+      canvas.drawCircle(Offset(x, y), 12, borderPaint);
+    }
+
+    // Draw all landmarks
+    final landmarks = pose.landmarks;
+
+    // Left arm - RED
+    drawLine(
+      landmarks[PoseLandmarkType.leftShoulder],
+      landmarks[PoseLandmarkType.leftElbow],
+      Colors.red,
+    );
+    drawLine(
+      landmarks[PoseLandmarkType.leftElbow],
+      landmarks[PoseLandmarkType.leftWrist],
+      Colors.red,
+    );
+
+    // Right arm - BLUE
+    drawLine(
+      landmarks[PoseLandmarkType.rightShoulder],
+      landmarks[PoseLandmarkType.rightElbow],
+      Colors.blue,
+    );
+    drawLine(
+      landmarks[PoseLandmarkType.rightElbow],
+      landmarks[PoseLandmarkType.rightWrist],
+      Colors.blue,
+    );
+
+    // Shoulders - YELLOW
+    drawLine(
+      landmarks[PoseLandmarkType.leftShoulder],
+      landmarks[PoseLandmarkType.rightShoulder],
+      Colors.yellow,
+    );
+
+    // Torso - GREEN
+    drawLine(
+      landmarks[PoseLandmarkType.leftShoulder],
+      landmarks[PoseLandmarkType.leftHip],
+      Colors.green,
+    );
+    drawLine(
+      landmarks[PoseLandmarkType.rightShoulder],
+      landmarks[PoseLandmarkType.rightHip],
+      Colors.green,
+    );
+    drawLine(
+      landmarks[PoseLandmarkType.leftHip],
+      landmarks[PoseLandmarkType.rightHip],
+      Colors.green,
+    );
+
+    // Left leg - CYAN
+    drawLine(
+      landmarks[PoseLandmarkType.leftHip],
+      landmarks[PoseLandmarkType.leftKnee],
+      Colors.cyan,
+    );
+    drawLine(
+      landmarks[PoseLandmarkType.leftKnee],
+      landmarks[PoseLandmarkType.leftAnkle],
+      Colors.cyan,
+    );
+
+    // Right leg - PURPLE
+    drawLine(
+      landmarks[PoseLandmarkType.rightHip],
+      landmarks[PoseLandmarkType.rightKnee],
+      Colors.purple,
+    );
+    drawLine(
+      landmarks[PoseLandmarkType.rightKnee],
+      landmarks[PoseLandmarkType.rightAnkle],
+      Colors.purple,
+    );
+
+    // Draw all points with different colors
+    drawPoint(landmarks[PoseLandmarkType.leftShoulder], Colors.red);
+    drawPoint(landmarks[PoseLandmarkType.leftElbow], Colors.red);
+    drawPoint(landmarks[PoseLandmarkType.leftWrist], Colors.red);
+
+    drawPoint(landmarks[PoseLandmarkType.rightShoulder], Colors.blue);
+    drawPoint(landmarks[PoseLandmarkType.rightElbow], Colors.blue);
+    drawPoint(landmarks[PoseLandmarkType.rightWrist], Colors.blue);
+
+    drawPoint(landmarks[PoseLandmarkType.leftHip], Colors.green);
+    drawPoint(landmarks[PoseLandmarkType.rightHip], Colors.green);
+
+    drawPoint(landmarks[PoseLandmarkType.leftKnee], Colors.cyan);
+    drawPoint(landmarks[PoseLandmarkType.leftAnkle], Colors.cyan);
+
+    drawPoint(landmarks[PoseLandmarkType.rightKnee], Colors.purple);
+    drawPoint(landmarks[PoseLandmarkType.rightAnkle], Colors.purple);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
+}
+
+class _CameraScreenState extends State<CameraScreen> {
+  late CameraController _controller;
+  late Future<void> _initializeControllerFuture;
+  late PoseDetector _poseDetector;
+  bool _isProcessing = false;
+  int _pullUpCount = 0;
+  bool _isInUpPosition = false;
+  Pose? _currentPose;
+  int _frameCount = 0;
+  int _poseDetectedCount = 0;
+  late final DateTime _sessionStart;
+
+  // Status gerakan
+  String _formFeedback = 'Detecting pose...';
+  bool _isProperForm = false;
+  double _repQuality = 0.0;
+
+  // Threshold dan konstanta
+  static const double _minArmAngle = 60.0;
+  static const double _maxShoulderDiff = 0.1;
+  static const double _minConfidence = 0.7;
+  static const Duration _minRepDuration = Duration(milliseconds: 1500);
+  DateTime? _lastRepTime;
+
+  @override
+  void initState() {
+    super.initState();
+
+    debugPrint('🎬 Initializing Camera Screen');
+    _sessionStart = DateTime.now();
+
+    _initializeControllerFuture = _initCameraAndPose();
+  }
+
+  @override
+  void dispose() {
+    debugPrint('🛑 Disposing camera');
+    _disposeCamera();
+    _controller.dispose();
+    _poseDetector.close();
+    super.dispose();
+  }
+
+  Future<void> _initCameraAndPose() async {
+    // Read user preference for pose model
+    final choice = await SettingsService().getPoseModelChoice();
+    final model = choice == PoseModelChoice.base
+        ? PoseDetectionModel.base
+        : PoseDetectionModel.accurate;
+
+    _poseDetector = PoseDetector(
+      options: PoseDetectorOptions(
+        mode: PoseDetectionMode.stream,
+        model: model,
+      ),
+    );
+
+    _controller = CameraController(
+      widget.camera,
+      ResolutionPreset.medium,
+      enableAudio: false,
+      imageFormatGroup: ImageFormatGroup.yuv420,
+    );
+
+    try {
+      await _controller.initialize();
+      debugPrint('📷 Camera initialized successfully');
+      if (mounted) {
+        _initializeCamera();
+      }
+    } catch (error) {
+      debugPrint('❌ Camera initialization error: $error');
+    }
+  }
+
+  InputImageRotation _getImageRotation() {
+    final sensorOrientation = widget.camera.sensorOrientation;
+    debugPrint('📐 Sensor orientation: $sensorOrientation');
+
+    // Map common Android sensor orientations to ML Kit rotation
+    switch (sensorOrientation) {
+      case 90:
+        return InputImageRotation.rotation90deg;
+      case 180:
+        return InputImageRotation.rotation180deg;
+      case 270:
+        return InputImageRotation.rotation270deg;
+      case 0:
+      default:
+        return InputImageRotation.rotation0deg;
+    }
+  }
+
+  Future<void> _processImage(CameraImage image) async {
+    if (_isProcessing) return;
+    _isProcessing = true;
+    _frameCount++;
+
+    try {
+      final WriteBuffer allBytes = WriteBuffer();
+      for (final Plane plane in image.planes) {
+        allBytes.putUint8List(plane.bytes);
+      }
+      final bytes = allBytes.done().buffer.asUint8List();
+
+      final Size imageSize = Size(
+        image.width.toDouble(),
+        image.height.toDouble(),
+      );
+
+      if (_frameCount % 30 == 0) {
+        debugPrint(
+          '📊 Frame $_frameCount - Image size: ${image.width}x${image.height}',
+        );
+      }
+
+      final inputImage = InputImage.fromBytes(
+        bytes: bytes,
+        metadata: InputImageMetadata(
+          size: imageSize,
+          rotation: _getImageRotation(),
+          format: InputImageFormat.yuv420,
+          bytesPerRow: image.planes[0].bytesPerRow,
+        ),
+      );
+
+      final poses = await _poseDetector.processImage(inputImage);
+
+      if (poses.isNotEmpty) {
+        _poseDetectedCount++;
+        if (_poseDetectedCount % 10 == 0) {
+          debugPrint('✅ Pose detected! Total: $_poseDetectedCount');
+          debugPrint('   Landmarks count: ${poses.first.landmarks.length}');
+        }
+
+        if (mounted) {
+          setState(() {
+            _currentPose = poses.first;
+            _formFeedback = 'Pose detected!';
+          });
+          _checkPullUp(poses.first);
+        }
+      } else {
+        if (_frameCount % 30 == 0) {
+          debugPrint('⚠️ No pose detected in frame $_frameCount');
+        }
+        if (mounted) {
+          setState(() {
+            _formFeedback = 'No person detected';
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('❌ Error processing image: $e');
+      if (mounted) {
+        setState(() {
+          _formFeedback = 'Error: $e';
+        });
+      }
+    } finally {
+      _isProcessing = false;
+    }
+  }
+
+  void _initializeCamera() {
+    debugPrint('🎥 Starting image stream');
+    _controller.startImageStream((CameraImage image) {
+      _processImage(image);
+    });
+  }
+
+  void _disposeCamera() {
+    if (_controller.value.isStreamingImages) {
+      _controller.stopImageStream();
+    }
+  }
+
+  Future<void> _saveSessionToHistory() async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        debugPrint('⚠️ Cannot save session: user not logged in');
+        return;
+      }
+
+      final durationMs = DateTime.now()
+          .difference(_sessionStart)
+          .inMilliseconds;
+
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .collection('workouts')
+          .add({
+            'pullUpCount': _pullUpCount,
+            'timestamp': Timestamp.now(),
+            'durationMs': durationMs,
+          });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Session saved to history')),
+        );
+      }
+    } catch (e) {
+      debugPrint('❌ Failed to save session: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Failed to save: $e')));
+      }
+    }
+  }
+
+  void _checkPullUp(Pose pose) {
+    final PoseLandmark? leftShoulder =
+        pose.landmarks[PoseLandmarkType.leftShoulder];
+    final PoseLandmark? leftElbow = pose.landmarks[PoseLandmarkType.leftElbow];
+    final PoseLandmark? leftWrist = pose.landmarks[PoseLandmarkType.leftWrist];
+    final PoseLandmark? rightShoulder =
+        pose.landmarks[PoseLandmarkType.rightShoulder];
+    final PoseLandmark? rightElbow =
+        pose.landmarks[PoseLandmarkType.rightElbow];
+    final PoseLandmark? rightWrist =
+        pose.landmarks[PoseLandmarkType.rightWrist];
+
+    if (leftShoulder != null &&
+        leftElbow != null &&
+        leftWrist != null &&
+        rightShoulder != null &&
+        rightElbow != null &&
+        rightWrist != null) {
+      bool isProperForm = _isArmsBent(
+        leftShoulder,
+        leftElbow,
+        leftWrist,
+        rightShoulder,
+        rightElbow,
+        rightWrist,
+      );
+
+      double quality = _calculateRepQuality(
+        leftShoulder,
+        leftElbow,
+        leftWrist,
+        rightShoulder,
+        rightElbow,
+        rightWrist,
+      );
+
+      setState(() {
+        _isProperForm = isProperForm;
+        _repQuality = quality;
+
+        if (!isProperForm) {
+          if (quality < 0.3) {
+            _formFeedback = "Keep your shoulders level and face forward";
+          } else if (quality < 0.6) {
+            _formFeedback = "Pull up higher, chin over the bar";
+          } else {
+            _formFeedback = "Almost there! Keep going";
+          }
+        } else {
+          _formFeedback = "Great form!";
+        }
+
+        if (isProperForm && !_isInUpPosition) {
+          final now = DateTime.now();
+          if (_lastRepTime == null ||
+              now.difference(_lastRepTime!) >= _minRepDuration) {
+            _isInUpPosition = true;
+            _pullUpCount++;
+            _lastRepTime = now;
+            debugPrint('💪 Pull-up counted! Total: $_pullUpCount');
+          }
+        } else if (!isProperForm && _isInUpPosition) {
+          _isInUpPosition = false;
+        }
+      });
+    }
+  }
+
+  double _calculateRepQuality(
+    PoseLandmark leftShoulder,
+    PoseLandmark leftElbow,
+    PoseLandmark leftWrist,
+    PoseLandmark rightShoulder,
+    PoseLandmark rightElbow,
+    PoseLandmark rightWrist,
+  ) {
+    double shoulderStability =
+        1.0 -
+        (math.min((leftShoulder.y - rightShoulder.y).abs(), _maxShoulderDiff) /
+            _maxShoulderDiff);
+
+    double leftHeight = math.max(0, (leftShoulder.y - leftWrist.y));
+    double rightHeight = math.max(0, (rightShoulder.y - rightWrist.y));
+    double heightQuality = (leftHeight + rightHeight) / 2.0;
+
+    double leftAngle = _calculateAngle(leftShoulder, leftElbow, leftWrist);
+    double rightAngle = _calculateAngle(rightShoulder, rightElbow, rightWrist);
+    double angleQuality =
+        1.0 - (math.min(leftAngle, rightAngle) / _minArmAngle);
+
+    double confidenceQuality =
+        math.min(
+          math.min(leftShoulder.likelihood, rightShoulder.likelihood),
+          math.min(
+            math.min(leftElbow.likelihood, rightElbow.likelihood),
+            math.min(leftWrist.likelihood, rightWrist.likelihood),
+          ),
+        ) /
+        _minConfidence;
+
+    return (shoulderStability * 0.3 +
+            heightQuality * 0.3 +
+            angleQuality * 0.2 +
+            confidenceQuality * 0.2)
+        .clamp(0.0, 1.0);
+  }
+
+  bool _isArmsBent(
+    PoseLandmark leftShoulder,
+    PoseLandmark leftElbow,
+    PoseLandmark leftWrist,
+    PoseLandmark rightShoulder,
+    PoseLandmark rightElbow,
+    PoseLandmark rightWrist,
+  ) {
+    double leftAngle = _calculateAngle(leftShoulder, leftElbow, leftWrist);
+    double rightAngle = _calculateAngle(rightShoulder, rightElbow, rightWrist);
+
+    double leftWristY = leftWrist.y;
+    double rightWristY = rightWrist.y;
+    double leftShoulderY = leftShoulder.y;
+    double rightShoulderY = rightShoulder.y;
+
+    bool properArmAngles = leftAngle < 60 && rightAngle < 60;
+    bool properHeight =
+        (leftWristY <= leftShoulderY && rightWristY <= rightShoulderY);
+    bool stablePosition = (leftShoulderY - rightShoulderY).abs() < 0.1;
+    bool highConfidence =
+        leftShoulder.likelihood > 0.7 &&
+        rightShoulder.likelihood > 0.7 &&
+        leftElbow.likelihood > 0.7 &&
+        rightElbow.likelihood > 0.7 &&
+        leftWrist.likelihood > 0.7 &&
+        rightWrist.likelihood > 0.7;
+
+    return properArmAngles && properHeight && stablePosition && highConfidence;
+  }
+
+  double _calculateAngle(
+    PoseLandmark shoulder,
+    PoseLandmark elbow,
+    PoseLandmark wrist,
+  ) {
+    double dx1 = shoulder.x - elbow.x;
+    double dy1 = shoulder.y - elbow.y;
+    double dx2 = wrist.x - elbow.x;
+    double dy2 = wrist.y - elbow.y;
+
+    double angle =
+        (180 / math.pi) *
+        math.acos(
+          (dx1 * dx2 + dy1 * dy2) /
+              (math.sqrt((dx1 * dx1 + dy1 * dy1) * (dx2 * dx2 + dy2 * dy2))),
+        );
+
+    return angle;
+  }
+
+  Color _getQualityColor(double quality) {
+    if (quality < 0.3) {
+      return Colors.red;
+    } else if (quality < 0.6) {
+      return Colors.orange;
+    } else if (quality < 0.8) {
+      return Colors.yellow;
+    } else {
+      return Colors.green;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: Stack(
+        children: <Widget>[
+          FutureBuilder<void>(
+            future: _initializeControllerFuture,
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.done) {
+                return SizedBox(
+                  width: MediaQuery.of(context).size.width,
+                  height: MediaQuery.of(context).size.height,
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      CameraPreview(_controller),
+                      if (_currentPose != null)
+                        CustomPaint(
+                          size: Size(
+                            MediaQuery.of(context).size.width,
+                            MediaQuery.of(context).size.height,
+                          ),
+                          painter: PosePainter(
+                            pose: _currentPose!,
+                            imageSize: Size(
+                              _controller.value.previewSize!.height,
+                              _controller.value.previewSize!.width,
+                            ),
+                            screenSize: Size(
+                              MediaQuery.of(context).size.width,
+                              MediaQuery.of(context).size.height,
+                            ),
+                            cameraLensDirection: widget.camera.lensDirection,
+                          ),
+                        ),
+                      if (_currentPose != null) const SizedBox.shrink(),
+                    ],
+                  ),
+                );
+              } else {
+                return const Center(
+                  child: CircularProgressIndicator(color: Color(0xFF2196F3)),
+                );
+              }
+            },
+          ),
+          // Top HUD with modern design
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            child: SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  children: [
+                    // Pull-up counter
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 24,
+                        vertical: 16,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF1A1F2E).withOpacity(0.95),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: const Color(0xFF2196F3).withOpacity(0.3),
+                          width: 1,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(
+                            Icons.fitness_center_rounded,
+                            color: Color(0xFF2196F3),
+                            size: 28,
+                          ),
+                          const SizedBox(width: 12),
+                          Text(
+                            '$_pullUpCount',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 40,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: -1,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Pull-ups',
+                            style: TextStyle(
+                              color: Colors.white.withOpacity(0.6),
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    // Form feedback
+                    if (_formFeedback.isNotEmpty)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 20,
+                          vertical: 12,
+                        ),
+                        decoration: BoxDecoration(
+                          color: _isProperForm
+                              ? const Color(0xFF4CAF50).withOpacity(0.9)
+                              : const Color(0xFFFF9800).withOpacity(0.9),
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              _isProperForm
+                                  ? Icons.check_circle_rounded
+                                  : Icons.info_rounded,
+                              color: Colors.white,
+                              size: 20,
+                            ),
+                            const SizedBox(width: 8),
+                            Flexible(
+                              child: Text(
+                                _formFeedback,
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    const SizedBox(height: 12),
+                    // Quality bar
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF1A1F2E).withOpacity(0.9),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Column(
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                'Form Quality',
+                                style: TextStyle(
+                                  color: Colors.white.withOpacity(0.7),
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              Text(
+                                '${(_repQuality * 100).toInt()}%',
+                                style: TextStyle(
+                                  color: _getQualityColor(_repQuality),
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(4),
+                            child: SizedBox(
+                              height: 6,
+                              child: LinearProgressIndicator(
+                                value: _repQuality,
+                                backgroundColor: Colors.white.withOpacity(0.1),
+                                valueColor: AlwaysStoppedAnimation(
+                                  _getQualityColor(_repQuality),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          // Bottom END button with modern design
+          Positioned(
+            bottom: 20,
+            left: 0,
+            right: 0,
+            child: Center(
+              child: Container(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.red.withOpacity(0.3),
+                      blurRadius: 20,
+                      spreadRadius: 2,
+                    ),
+                  ],
+                ),
+                child: ElevatedButton.icon(
+                  onPressed: () async {
+                    final confirm =
+                        await showDialog<bool>(
+                          context: context,
+                          builder: (ctx) => AlertDialog(
+                            backgroundColor: const Color(0xFF1A1F2E),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            title: const Text(
+                              'End Session?',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            content: const Text(
+                              'Your pull-up count will be saved to history.',
+                              style: TextStyle(color: Colors.white70),
+                            ),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.of(ctx).pop(false),
+                                child: Text(
+                                  'Cancel',
+                                  style: TextStyle(
+                                    color: Colors.white.withOpacity(0.6),
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                              ElevatedButton(
+                                onPressed: () => Navigator.of(ctx).pop(true),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.red,
+                                  foregroundColor: Colors.white,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                ),
+                                child: const Text(
+                                  'End Session',
+                                  style: TextStyle(fontWeight: FontWeight.w700),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ) ??
+                        false;
+
+                    if (!confirm) return;
+
+                    await _saveSessionToHistory();
+                    if (mounted) {
+                      Navigator.of(context).pop();
+                    }
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFD32F2F),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 40,
+                      vertical: 16,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    elevation: 0,
+                  ),
+                  icon: const Icon(Icons.stop_rounded, size: 24),
+                  label: const Text(
+                    'End Session',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
