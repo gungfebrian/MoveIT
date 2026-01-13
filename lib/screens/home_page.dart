@@ -21,7 +21,6 @@ class _HomePageState extends State<HomePage> {
 
   // Using theme colors
   static const Color primaryOrange = AppTheme.primary;
-  static const Color darkBg = AppTheme.background;
   static const Color cardBg = AppTheme.card;
 
   static final List<Widget> _pages = <Widget>[
@@ -89,22 +88,45 @@ class _HomePageState extends State<HomePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: darkBg,
-      body: _pages[_selectedIndex],
+      backgroundColor:
+          AppTheme.background, // Match Login Page Solid Black via Theme
+      body: Stack(
+        children: [
+          // Ambient Glow (Top Right) - Matches Login Page
+          Positioned(
+            top: -100,
+            right: -100,
+            child: Container(
+              width: 300,
+              height: 300,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: primaryOrange.withOpacity(0.08),
+                boxShadow: [
+                  BoxShadow(
+                    color: primaryOrange.withOpacity(0.08),
+                    blurRadius: 100,
+                    spreadRadius: 20,
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          // Content
+          _pages[_selectedIndex],
+        ],
+      ),
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
-          color: cardBg,
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.3),
-              blurRadius: 10,
-              offset: const Offset(0, -2),
-            ),
-          ],
+          color: cardBg.withOpacity(0.95), // Slight glass effect
+          border: Border(
+            top: BorderSide(color: Colors.white.withOpacity(0.05), width: 1),
+          ),
         ),
         child: SafeArea(
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [

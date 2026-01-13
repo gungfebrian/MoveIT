@@ -10,14 +10,19 @@ class AppTheme {
   // ============================================
 
   // Background Colors - "Deep Space Black"
-  static const Color background = Color(0xFF000000); // True OLED Black
-  static const Color surface = Color(0xFF1C1C1E); // Apple Card Dark Gray
+  // Background Colors - "Deep Space Black"
+  static const Color background = Color(0xFF08080C); // Matches Login Page
+  static const Color surface = Color(0xFF12121A); // Matches Login Page
   static const Color elevated = Color(0xFF2C2C2E); // Lighter Gray for elevation
-  static const Color card = Color(0xFF1C1C1E);
+  static const Color card = Color(0xFF12121A); // Matches Login Page
 
   // Brand Accents
-  static const Color primary = Color(0xFFFF6B4A); // Nike Coral/Orange
-  static const Color primaryLight = Color(0xFFFF8A6D);
+  static const Color primary = Color(
+    0xFFFF5C00,
+  ); // Vibrant Athletic Orange (Matches Login)
+  static const Color primaryLight = Color(
+    0xFFFF8A00,
+  ); // Accent Orange (Matches Login)
   static const Color primaryDark = Color(0xFFE55A3A);
 
   // Functional Colors

@@ -77,7 +77,7 @@ class _HomeTabState extends State<HomeTab> with TickerProviderStateMixin {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: darkBg,
+      backgroundColor: Colors.transparent, // Let gradient show through
       body: SafeArea(
         child: SingleChildScrollView(
           physics: const BouncingScrollPhysics(),
@@ -113,13 +113,35 @@ class _HomeTabState extends State<HomeTab> with TickerProviderStateMixin {
           ),
         ),
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _startWorkout(context),
-        backgroundColor: primaryOrange,
-        icon: const Icon(Icons.play_arrow_rounded, color: Colors.white),
-        label: const Text(
-          'Start Workout',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+      floatingActionButton: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(30),
+          gradient: const LinearGradient(
+            colors: [Color(0xFFFF5C00), Color(0xFFFF8A00)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          boxShadow: [], // Removed shadow as requested
+          border: Border.all(color: Colors.white.withOpacity(0.2), width: 1),
+        ),
+        child: FloatingActionButton.extended(
+          onPressed: () => _startWorkout(context),
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          highlightElevation: 0,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(30),
+          ),
+          icon: const Icon(Icons.play_arrow_rounded, color: Colors.white),
+          label: const Text(
+            'START WORKOUT',
+            style: TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w800,
+              fontSize: 15,
+              letterSpacing: 1.0,
+            ),
+          ),
         ),
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
@@ -135,8 +157,8 @@ class _HomeTabState extends State<HomeTab> with TickerProviderStateMixin {
         children: [
           // Profile Avatar
           Container(
-            width: 44,
-            height: 44,
+            width: 48,
+            height: 48,
             decoration: BoxDecoration(
               color: cardBg,
               shape: BoxShape.circle,
@@ -144,6 +166,13 @@ class _HomeTabState extends State<HomeTab> with TickerProviderStateMixin {
                 color: Colors.white.withOpacity(0.1),
                 width: 1,
               ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.2),
+                  blurRadius: 8,
+                  offset: const Offset(0, 4),
+                ),
+              ],
             ),
             child: ClipOval(
               child: user?.photoURL != null
@@ -163,7 +192,7 @@ class _HomeTabState extends State<HomeTab> with TickerProviderStateMixin {
                     ),
             ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 16),
           // Greeting
           Expanded(
             child: Column(
@@ -171,15 +200,20 @@ class _HomeTabState extends State<HomeTab> with TickerProviderStateMixin {
               children: [
                 Text(
                   '${_getGreeting()}, $_userName',
-                  style: const TextStyle(fontSize: 14, color: Colors.white60),
-                ),
-                const SizedBox(height: 2),
-                const Text(
-                  "Let's crush today's workout",
                   style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
+                    fontSize: 15,
+                    color: Colors.white.withOpacity(0.7),
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                const Text(
+                  "Let's crush it! 💪",
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w800,
                     color: Colors.white,
+                    letterSpacing: -0.5,
                   ),
                 ),
               ],
@@ -189,7 +223,11 @@ class _HomeTabState extends State<HomeTab> with TickerProviderStateMixin {
           Container(
             width: 44,
             height: 44,
-            decoration: BoxDecoration(color: cardBg, shape: BoxShape.circle),
+            decoration: BoxDecoration(
+              color: cardBg.withOpacity(0.5),
+              shape: BoxShape.circle,
+              border: Border.all(color: Colors.white.withOpacity(0.05)),
+            ),
             child: Icon(
               Icons.notifications_outlined,
               color: Colors.white.withOpacity(0.7),
@@ -219,20 +257,22 @@ class _HomeTabState extends State<HomeTab> with TickerProviderStateMixin {
             // Current Streak
             Expanded(
               child: _buildStreakCard(
-                icon: '🔥',
+                icon: Icons.local_fire_department_rounded,
                 label: 'Current streak',
                 value: currentStreak,
-                valueColor: primaryOrange,
+                color: const Color(0xFFFF5C00),
+                tag: 'ACTIVE',
               ),
             ),
             const SizedBox(width: 16),
             // Best Streak
             Expanded(
               child: _buildStreakCard(
-                icon: '💧',
+                icon: Icons.bolt_rounded,
                 label: 'Best streak',
                 value: bestStreak,
-                valueColor: const Color(0xFF007AFF),
+                color: const Color(0xFF007AFF),
+                tag: 'RECORD',
               ),
             ),
           ],
@@ -242,44 +282,75 @@ class _HomeTabState extends State<HomeTab> with TickerProviderStateMixin {
   }
 
   Widget _buildStreakCard({
-    required String icon,
+    required IconData icon,
     required String label,
     required int value,
-    required Color valueColor,
+    required Color color,
+    required String tag,
   }) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: cardBg,
-        borderRadius: BorderRadius.circular(16),
+        color: cardBg.withOpacity(0.6),
+        borderRadius: BorderRadius.circular(24),
         border: Border.all(color: Colors.white.withOpacity(0.05), width: 1),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [cardBg.withOpacity(0.8), cardBg.withOpacity(0.4)],
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(icon, style: const TextStyle(fontSize: 18)),
-              const SizedBox(width: 6),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 13,
-                  color: Colors.white.withOpacity(0.6),
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.15),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(icon, color: color, size: 20),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  tag,
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    color: color,
+                    letterSpacing: 0.5,
+                  ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 16),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 13,
+              color: Colors.white.withOpacity(0.5),
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 4),
           Row(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Text(
                 '$value',
-                style: TextStyle(
+                style: const TextStyle(
                   fontSize: 32,
                   fontWeight: FontWeight.w800,
-                  color: valueColor,
+                  color: Colors.white,
                   height: 1,
                 ),
               ),
@@ -289,8 +360,9 @@ class _HomeTabState extends State<HomeTab> with TickerProviderStateMixin {
                 child: Text(
                   'days',
                   style: TextStyle(
-                    fontSize: 15,
-                    color: Colors.white.withOpacity(0.5),
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white.withOpacity(0.3),
                   ),
                 ),
               ),
@@ -400,26 +472,34 @@ class _HomeTabState extends State<HomeTab> with TickerProviderStateMixin {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
       decoration: BoxDecoration(
-        color: cardBg,
-        borderRadius: BorderRadius.circular(14),
+        color: cardBg.withOpacity(0.6),
+        borderRadius: BorderRadius.circular(20),
         border: Border.all(color: Colors.white.withOpacity(0.08), width: 1),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [cardBg.withOpacity(0.8), cardBg.withOpacity(0.4)],
+        ),
       ),
       child: Column(
         children: [
+          Icon(icon, color: primaryOrange, size: 24),
+          const SizedBox(height: 12),
+          Text(
+            value,
+            style: const TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.w800,
+              color: Colors.white,
+            ),
+          ),
+          const SizedBox(height: 4),
           Text(
             label,
             style: TextStyle(
               fontSize: 12,
+              fontWeight: FontWeight.w500,
               color: Colors.white.withOpacity(0.5),
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            value,
-            style: const TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.w800,
-              color: Colors.white,
             ),
           ),
         ],

@@ -18,7 +18,9 @@ class _LoginPageState extends State<LoginPage> {
   // Premium Palette
   static const Color _bgColor = Color(0xFF08080C); // Deeper black
   static const Color _surfaceColor = Color(0xFF12121A);
-  static const Color _primaryOrange = Color(0xFFFF5C00); // More vibrant athletic orange
+  static const Color _primaryOrange = Color(
+    0xFFFF5C00,
+  ); // More vibrant athletic orange
   static const Color _accentOrange = Color(0xFFFF8A00);
   static const Color _textPrimary = Colors.white;
   static const Color _textSecondary = Color(0xFF94949E);
@@ -27,12 +29,14 @@ class _LoginPageState extends State<LoginPage> {
     {
       'icon': Icons.bolt_rounded,
       'title': 'ELITE\nPERFORMANCE',
-      'subtitle': 'Engineering the ultimate athlete within you through precision tracking.',
+      'subtitle':
+          'Engineering the ultimate athlete within you through precision tracking.',
     },
     {
       'icon': Icons.biotech_rounded,
       'title': 'AI FORM\nANALYSIS',
-      'subtitle': 'Real-time computer vision to perfect your technique and prevent injury.',
+      'subtitle':
+          'Real-time computer vision to perfect your technique and prevent injury.',
     },
     {
       'icon': Icons.leaderboard_rounded,
@@ -76,7 +80,7 @@ class _LoginPageState extends State<LoginPage> {
               ),
             ),
           ),
-          
+
           SafeArea(
             child: Column(
               children: [
@@ -93,7 +97,7 @@ class _LoginPageState extends State<LoginPage> {
                           color: _primaryOrange.withOpacity(0.1),
                           blurRadius: 40,
                           spreadRadius: 5,
-                        )
+                        ),
                       ],
                     ),
                     child: ClipRRect(
@@ -112,14 +116,21 @@ class _LoginPageState extends State<LoginPage> {
                                   end: Alignment.bottomRight,
                                 ),
                               ),
-                              child: const Icon(Icons.fitness_center_rounded, size: 100, color: Colors.white),
+                              child: const Icon(
+                                Icons.fitness_center_rounded,
+                                size: 100,
+                                color: Colors.white,
+                              ),
                             ),
                           ),
                           // Subtle overlay for text readability
                           Container(
                             decoration: BoxDecoration(
                               gradient: LinearGradient(
-                                colors: [Colors.black.withOpacity(0.4), Colors.transparent],
+                                colors: [
+                                  Colors.black.withOpacity(0.4),
+                                  Colors.transparent,
+                                ],
                                 begin: Alignment.bottomCenter,
                                 end: Alignment.topCenter,
                               ),
@@ -141,7 +152,8 @@ class _LoginPageState extends State<LoginPage> {
                         Expanded(
                           child: PageView.builder(
                             controller: _pageController,
-                            onPageChanged: (i) => setState(() => _currentPage = i),
+                            onPageChanged: (i) =>
+                                setState(() => _currentPage = i),
                             itemCount: _slides.length,
                             itemBuilder: (context, index) {
                               final slide = _slides[index];
@@ -187,7 +199,9 @@ class _LoginPageState extends State<LoginPage> {
                               height: 6,
                               width: isSelected ? 30 : 6,
                               decoration: BoxDecoration(
-                                color: isSelected ? _primaryOrange : _textSecondary.withOpacity(0.3),
+                                color: isSelected
+                                    ? _primaryOrange
+                                    : _textSecondary.withOpacity(0.3),
                                 borderRadius: BorderRadius.circular(10),
                               ),
                             );
@@ -198,7 +212,12 @@ class _LoginPageState extends State<LoginPage> {
                         // Action Buttons
                         _buildButton(
                           text: 'GET STARTED',
-                          onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (c) => const RegisterPage())),
+                          onPressed: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (c) => const RegisterPage(),
+                            ),
+                          ),
                           isPrimary: true,
                         ),
                         const SizedBox(height: 12),
@@ -210,10 +229,17 @@ class _LoginPageState extends State<LoginPage> {
 
                         // Demo Mode
                         TextButton(
-                          onPressed: () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (c) => const HomePage())),
+                          onPressed: () => Navigator.pushReplacement(
+                            context,
+                            MaterialPageRoute(builder: (c) => const HomePage()),
+                          ),
                           child: const Text(
                             'Enter as Guest',
-                            style: TextStyle(color: _textSecondary, fontWeight: FontWeight.w500, letterSpacing: 1),
+                            style: TextStyle(
+                              color: _textSecondary,
+                              fontWeight: FontWeight.w500,
+                              letterSpacing: 1,
+                            ),
                           ),
                         ),
                         const SizedBox(height: 10),
@@ -229,7 +255,11 @@ class _LoginPageState extends State<LoginPage> {
     );
   }
 
-  Widget _buildButton({required String text, required VoidCallback onPressed, bool isPrimary = true}) {
+  Widget _buildButton({
+    required String text,
+    required VoidCallback onPressed,
+    bool isPrimary = true,
+  }) {
     return SizedBox(
       width: double.infinity,
       height: 60,
@@ -240,18 +270,37 @@ class _LoginPageState extends State<LoginPage> {
                 backgroundColor: _primaryOrange,
                 foregroundColor: Colors.white,
                 elevation: 0,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(18),
+                ),
               ),
-              child: Text(text, style: const TextStyle(fontWeight: FontWeight.w800, letterSpacing: 1.2)),
+              child: Text(
+                text,
+                style: const TextStyle(
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 1.2,
+                ),
+              ),
             )
           : OutlinedButton(
               onPressed: onPressed,
               style: OutlinedButton.styleFrom(
                 foregroundColor: _textPrimary,
-                side: BorderSide(color: _textSecondary.withOpacity(0.3), width: 1.5),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+                side: BorderSide(
+                  color: _textSecondary.withOpacity(0.3),
+                  width: 1.5,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(18),
+                ),
               ),
-              child: Text(text, style: const TextStyle(fontWeight: FontWeight.w800, letterSpacing: 1.2)),
+              child: Text(
+                text,
+                style: const TextStyle(
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 1.2,
+                ),
+              ),
             ),
     );
   }
@@ -274,7 +323,7 @@ class _LoginBottomSheetState extends State<_LoginBottomSheet> {
   @override
   Widget build(BuildContext context) {
     final bottomPadding = MediaQuery.of(context).viewInsets.bottom;
-    
+
     return Container(
       padding: EdgeInsets.fromLTRB(28, 20, 28, 28 + bottomPadding),
       decoration: const BoxDecoration(
@@ -287,26 +336,50 @@ class _LoginBottomSheetState extends State<_LoginBottomSheet> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Center(
-              child: Container(width: 45, height: 5, decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(10))),
+              child: Container(
+                width: 45,
+                height: 5,
+                decoration: BoxDecoration(
+                  color: Colors.white24,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
             ),
             const SizedBox(height: 32),
-            const Text('Welcome Back', style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900, color: Colors.white)),
-            const Text('Resume your evolution.', style: TextStyle(color: Colors.white54, fontSize: 16)),
+            const Text(
+              'Welcome Back',
+              style: TextStyle(
+                fontSize: 28,
+                fontWeight: FontWeight.w900,
+                color: Colors.white,
+              ),
+            ),
+            const Text(
+              'Resume your evolution.',
+              style: TextStyle(color: Colors.white54, fontSize: 16),
+            ),
             const SizedBox(height: 32),
-            
-            _buildField(controller: _email, hint: 'Email', icon: Icons.alternate_email_rounded),
+
+            _buildField(
+              controller: _email,
+              hint: 'Email',
+              icon: Icons.alternate_email_rounded,
+            ),
             const SizedBox(height: 16),
             _buildField(
-              controller: _pass, 
-              hint: 'Password', 
-              icon: Icons.lock_person_rounded, 
+              controller: _pass,
+              hint: 'Password',
+              icon: Icons.lock_person_rounded,
               isPass: true,
               suffix: IconButton(
-                icon: Icon(_obscure ? Icons.visibility_off : Icons.visibility, color: Colors.white38),
+                icon: Icon(
+                  _obscure ? Icons.visibility_off : Icons.visibility,
+                  color: Colors.white38,
+                ),
                 onPressed: () => setState(() => _obscure = !_obscure),
               ),
             ),
-            
+
             const SizedBox(height: 32),
             SizedBox(
               width: double.infinity,
@@ -315,11 +388,26 @@ class _LoginBottomSheetState extends State<_LoginBottomSheet> {
                 onPressed: _loading ? null : _handleLogin,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFFFF5C00),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(18),
+                  ),
                 ),
-                child: _loading 
-                  ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                  : const Text('SIGN IN', style: TextStyle(fontWeight: FontWeight.w800, color: Colors.white)),
+                child: _loading
+                    ? const SizedBox(
+                        width: 24,
+                        height: 24,
+                        child: CircularProgressIndicator(
+                          color: Colors.white,
+                          strokeWidth: 2,
+                        ),
+                      )
+                    : const Text(
+                        'SIGN IN',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w800,
+                          color: Colors.white,
+                        ),
+                      ),
               ),
             ),
             const SizedBox(height: 16),
@@ -327,8 +415,15 @@ class _LoginBottomSheetState extends State<_LoginBottomSheet> {
             Center(
               child: TextButton.icon(
                 onPressed: () {},
-                icon: const Icon(Icons.g_mobiledata_rounded, size: 32, color: Colors.white),
-                label: const Text('Continue with Google', style: TextStyle(color: Colors.white70)),
+                icon: const Icon(
+                  Icons.g_mobiledata_rounded,
+                  size: 32,
+                  color: Colors.white,
+                ),
+                label: const Text(
+                  'Continue with Google',
+                  style: TextStyle(color: Colors.white70),
+                ),
               ),
             ),
           ],
@@ -337,7 +432,13 @@ class _LoginBottomSheetState extends State<_LoginBottomSheet> {
     );
   }
 
-  Widget _buildField({required TextEditingController controller, required String hint, required IconData icon, bool isPass = false, Widget? suffix}) {
+  Widget _buildField({
+    required TextEditingController controller,
+    required String hint,
+    required IconData icon,
+    bool isPass = false,
+    Widget? suffix,
+  }) {
     return TextField(
       controller: controller,
       obscureText: isPass && _obscure,
@@ -349,7 +450,10 @@ class _LoginBottomSheetState extends State<_LoginBottomSheet> {
         suffixIcon: suffix,
         filled: true,
         fillColor: Colors.white.withOpacity(0.05),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(18), borderSide: BorderSide.none),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(18),
+          borderSide: BorderSide.none,
+        ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(18),
           borderSide: const BorderSide(color: Color(0xFFFF5C00), width: 1),
@@ -360,13 +464,22 @@ class _LoginBottomSheetState extends State<_LoginBottomSheet> {
 
   void _handleLogin() async {
     setState(() => _loading = true);
-    final error = await widget.authService.signInWithEmailPassword(email: _email.text, password: _pass.text);
+    final error = await widget.authService.signInWithEmailPassword(
+      email: _email.text,
+      password: _pass.text,
+    );
     if (error == null && mounted) {
-      Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (c) => const HomePage()), (r) => false);
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (c) => const HomePage()),
+        (r) => false,
+      );
     } else {
       if (mounted) {
         setState(() => _loading = false);
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error ?? 'Login Failed')));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(error ?? 'Login Failed')));
       }
     }
   }
