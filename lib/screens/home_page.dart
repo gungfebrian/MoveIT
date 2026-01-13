@@ -1,11 +1,13 @@
 // lib/screens/home_page.dart
 
 import 'package:flutter/material.dart';
+import '../theme/app_theme.dart';
 import 'login_page.dart';
 import 'home_tab.dart';
 import 'history_tab.dart';
+import 'progress_screen.dart';
 import 'profile_tab.dart';
-import '../services/auth_service.dart'; // Import AuthService
+import '../services/auth_service.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -17,14 +19,15 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   int _selectedIndex = 0;
 
-  // Updated colors to match modern UI
-  static const Color primaryBlue = Color(0xFF2196F3);
-  static const Color darkBg = Color(0xFF0A0E1A);
-  static const Color cardBg = Color(0xFF1A1F2E);
+  // Using theme colors
+  static const Color primaryOrange = AppTheme.primary;
+  static const Color darkBg = AppTheme.background;
+  static const Color cardBg = AppTheme.card;
 
   static final List<Widget> _pages = <Widget>[
     const HomeTab(),
-    const HistoryTab(),
+    const HistoryTab(), // Workouts/History
+    const ProgressScreen(), // New Progress Screen
     const ProfileTab(),
   ];
 
@@ -85,24 +88,8 @@ class _HomePageState extends State<HomePage> {
 
   @override
   Widget build(BuildContext context) {
-    final List<String> titles = ['T-Move', 'History', 'Profile'];
-
     return Scaffold(
       backgroundColor: darkBg,
-      appBar: _selectedIndex == 0 || _selectedIndex == 2
-          ? null // No AppBar on Home tab and Profile tab
-          : AppBar(
-              title: Text(
-                titles[_selectedIndex],
-                style: const TextStyle(
-                  fontWeight: FontWeight.w700,
-                  fontSize: 20,
-                ),
-              ),
-              backgroundColor: darkBg,
-              foregroundColor: Colors.white,
-              elevation: 0,
-            ),
       body: _pages[_selectedIndex],
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
@@ -117,7 +104,7 @@ class _HomePageState extends State<HomePage> {
         ),
         child: SafeArea(
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
@@ -127,14 +114,19 @@ class _HomePageState extends State<HomePage> {
                   index: 0,
                 ),
                 _buildNavItem(
-                  icon: Icons.history_rounded,
-                  label: 'History',
+                  icon: Icons.fitness_center_rounded,
+                  label: 'Workouts',
                   index: 1,
+                ),
+                _buildNavItem(
+                  icon: Icons.pie_chart_rounded,
+                  label: 'Progress',
+                  index: 2,
                 ),
                 _buildNavItem(
                   icon: Icons.person_rounded,
                   label: 'Profile',
-                  index: 2,
+                  index: 3,
                 ),
               ],
             ),
@@ -166,7 +158,7 @@ class _HomePageState extends State<HomePage> {
                   boxShadow: isSelected
                       ? [
                           BoxShadow(
-                            color: primaryBlue.withOpacity(0.5),
+                            color: primaryOrange.withOpacity(0.5),
                             blurRadius: 20,
                             spreadRadius: 5,
                           ),
@@ -176,20 +168,20 @@ class _HomePageState extends State<HomePage> {
                 child: Icon(
                   icon,
                   color: isSelected
-                      ? primaryBlue
-                      : Colors.white.withOpacity(0.5),
-                  size: 28,
+                      ? primaryOrange
+                      : Colors.white.withOpacity(0.4),
+                  size: 26,
                 ),
               ),
               const SizedBox(height: 4),
               Text(
                 label,
                 style: TextStyle(
-                  fontSize: 12,
+                  fontSize: 11,
                   fontWeight: FontWeight.w500,
                   color: isSelected
-                      ? primaryBlue
-                      : Colors.white.withOpacity(0.5),
+                      ? primaryOrange
+                      : Colors.white.withOpacity(0.4),
                 ),
               ),
             ],

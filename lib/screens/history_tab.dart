@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import '../theme/app_theme.dart';
 
 class HistoryTab extends StatelessWidget {
-  final Color primaryBlue = const Color(0xFF2196F3);
-  final Color darkBg = const Color(0xFF0A0E1A);
-  final Color cardBg = const Color(0xFF1A1F2E);
+  final Color primaryBlue = AppTheme.primary;
+  final Color darkBg = AppTheme.background;
+  final Color cardBg = AppTheme.card;
 
   const HistoryTab({super.key});
 

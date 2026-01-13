@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_core/firebase_core.dart';
 
-import 'package:mobile/screens/splash_screen.dart';
+import 'package:mobile/screens/onboarding_page.dart';
 import 'package:mobile/providers/theme_provider.dart';
 import 'package:mobile/theme/app_theme.dart';
 import 'firebase_options.dart';
@@ -27,13 +27,13 @@ class MyApp extends StatelessWidget {
     return Consumer<ThemeProvider>(
       builder: (context, themeProvider, child) {
         return MaterialApp(
-          title: 'T-Move',
+          title: 'MoveIt',
           debugShowCheckedModeBanner: false,
           theme: AppTheme.lightTheme,
           darkTheme: AppTheme.darkTheme,
           themeMode: themeProvider.themeMode,
-          // Start at SplashScreen to handle onboarding and auth routing
-          home: const SplashScreen(),
+          // Start directly at Onboarding (Splash removed)
+          home: const OnboardingScreen(),
         );
       },
     );

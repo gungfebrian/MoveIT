@@ -162,7 +162,7 @@ class _WorkoutSetupScreenState extends State<WorkoutSetupScreen> {
                       ),
                     ),
                   );
-                }).toList(),
+                }),
 
                 const SizedBox(height: 24),
 
@@ -203,7 +203,7 @@ class _WorkoutSetupScreenState extends State<WorkoutSetupScreen> {
                         onChanged: (value) {
                           setState(() => _formAnalysisEnabled = value);
                         },
-                        activeColor: Colors.white,
+                        activeThumbColor: Colors.white,
                         activeTrackColor: Colors.green.shade400,
                       ),
                     ],

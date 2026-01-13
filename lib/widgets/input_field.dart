@@ -11,14 +11,14 @@ class InputFieldWidget extends StatelessWidget {
   final Widget? suffixIcon;
 
   const InputFieldWidget({
-    Key? key,
+    super.key,
     required this.controller,
     required this.label,
     required this.hint,
     this.keyboardType = TextInputType.text,
     this.obscureText = false,
     this.suffixIcon,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

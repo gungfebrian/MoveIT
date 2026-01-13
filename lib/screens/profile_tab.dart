@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../theme/app_theme.dart';
 import '../providers/theme_provider.dart';
 import '../services/auth_service.dart';
 import '../services/settings_service.dart';
@@ -24,12 +25,12 @@ class _ProfileTabState extends State<ProfileTab> {
   String? _avatarEmoji;
   PoseModelChoice _poseModelChoice = PoseModelChoice.accurate;
 
-  // Dark theme colors
-  final Color backgroundColor = const Color(0xFF0A1929);
-  final Color cardColor = const Color(0xFF1A2B3D);
-  final Color accentColor = const Color(0xFF4FC3F7);
-  final Color textColor = const Color(0xFFFFFFFF);
-  final Color subtitleColor = const Color(0xFF6B7D8F);
+  // Using theme colors
+  final Color backgroundColor = AppTheme.background;
+  final Color cardColor = AppTheme.card;
+  final Color accentColor = AppTheme.primary;
+  final Color textColor = AppTheme.textPrimary;
+  final Color subtitleColor = AppTheme.textSecondary;
 
   @override
   void initState() {
@@ -270,7 +271,7 @@ class _ProfileTabState extends State<ProfileTab> {
                             onChanged: (value) {
                               themeProvider.toggleTheme();
                             },
-                            activeColor: Colors.white,
+                            activeThumbColor: Colors.white,
                             activeTrackColor: accentColor,
                             inactiveThumbColor: Colors.grey,
                             inactiveTrackColor: Colors.grey.shade700,
