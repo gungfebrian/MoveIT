@@ -9,8 +9,13 @@ import 'dart:math' as math;
 
 class CameraScreen extends StatefulWidget {
   final CameraDescription camera;
+  final String exerciseType;
 
-  const CameraScreen({super.key, required this.camera});
+  const CameraScreen({
+    super.key,
+    required this.camera,
+    this.exerciseType = 'Pull-Up',
+  });
 
   @override
   State<CameraScreen> createState() => _CameraScreenState();

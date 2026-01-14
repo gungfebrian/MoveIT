@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../theme/app_theme.dart';
+import 'session_detail_screen.dart';
 
 class HistoryTab extends StatelessWidget {
   final Color primaryBlue = AppTheme.primary;
@@ -19,29 +20,24 @@ class HistoryTab extends StatelessWidget {
           .collection('workouts')
           .get();
 
-      int totalPullUps = 0;
+      int totalCalories = 0;
+      int totalMinutes = 0;
       int totalSessions = workoutsSnapshot.docs.length;
-      int dailyRecord = 0;
 
       for (var doc in workoutsSnapshot.docs) {
         final data = doc.data();
-        final pullUpCount = data['pullUpCount'] as int? ?? 0;
-        totalPullUps += pullUpCount;
-
-        // Track highest pull-ups in a single session
-        if (pullUpCount > dailyRecord) {
-          dailyRecord = pullUpCount;
-        }
+        totalCalories += (data['calories'] as int?) ?? 0;
+        totalMinutes += (data['durationMinutes'] as int?) ?? 0;
       }
 
       return {
-        'totalPullUps': totalPullUps,
+        'totalCalories': totalCalories,
+        'totalMinutes': totalMinutes,
         'totalSessions': totalSessions,
-        'dailyRecord': dailyRecord,
       };
     } catch (e) {
       print('Error fetching user stats: $e');
-      return {'totalPullUps': 0, 'totalSessions': 0, 'dailyRecord': 0};
+      return {'totalCalories': 0, 'totalMinutes': 0, 'totalSessions': 0};
     }
   }
 
@@ -102,7 +98,11 @@ class HistoryTab extends StatelessWidget {
 
                   final stats =
                       statsSnapshot.data ??
-                      {'totalPullUps': 0, 'totalSessions': 0, 'dailyRecord': 0};
+                      {
+                        'totalCalories': 0,
+                        'totalMinutes': 0,
+                        'totalSessions': 0,
+                      };
 
                   return Container(
                     padding: const EdgeInsets.all(24),
@@ -126,8 +126,8 @@ class HistoryTab extends StatelessWidget {
                           mainAxisAlignment: MainAxisAlignment.spaceAround,
                           children: [
                             _buildStatColumn(
-                              '${stats['totalPullUps']}',
-                              'Total\nPull-Ups',
+                              '${stats['totalSessions']}',
+                              'Total\nWorkouts',
                               Icons.fitness_center_rounded,
                             ),
                             Container(
@@ -136,9 +136,9 @@ class HistoryTab extends StatelessWidget {
                               color: Colors.white.withOpacity(0.1),
                             ),
                             _buildStatColumn(
-                              '${stats['totalSessions']}',
-                              'Workout\nSessions',
-                              Icons.event_note_rounded,
+                              '${stats['totalCalories']}',
+                              'Total\nCalories',
+                              Icons.local_fire_department_rounded,
                             ),
                             Container(
                               height: 50,
@@ -146,9 +146,9 @@ class HistoryTab extends StatelessWidget {
                               color: Colors.white.withOpacity(0.1),
                             ),
                             _buildStatColumn(
-                              '${stats['dailyRecord']}',
-                              'Best\nRecord',
-                              Icons.emoji_events_rounded,
+                              '${stats['totalMinutes']}',
+                              'Total\nMinutes',
+                              Icons.timer_rounded,
                             ),
                           ],
                         ),
@@ -240,15 +240,33 @@ class HistoryTab extends StatelessWidget {
                     itemBuilder: (context, index) {
                       final doc = snapshot.data!.docs[index];
                       final data = doc.data() as Map<String, dynamic>;
+                      final sessionId = doc.id;
 
-                      final pullUps = data['pullUpCount'] ?? 0;
-                      final timestamp = (data['timestamp'] as Timestamp?)
-                          ?.toDate();
+                      // Determine session type
+                      final type = data['type'] as String? ?? 'routine';
+                      final isMLSession = type == 'camera' || type == 'ml';
 
-                      return _buildSessionCard(
-                        pullUps: pullUps,
-                        timestamp: timestamp,
-                        isLatest: index == 0,
+                      return GestureDetector(
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => SessionDetailScreen(
+                                sessionData: data,
+                                sessionId: sessionId,
+                              ),
+                            ),
+                          );
+                        },
+                        child: isMLSession
+                            ? _buildMLSessionCard(
+                                data: data,
+                                isLatest: index == 0,
+                              )
+                            : _buildRoutineSessionCard(
+                                data: data,
+                                isLatest: index == 0,
+                              ),
                       );
                     },
                   );
@@ -291,11 +309,132 @@ class HistoryTab extends StatelessWidget {
     );
   }
 
-  Widget _buildSessionCard({
-    required int pullUps,
-    DateTime? timestamp,
+  // ML-tracked session card (Pull-Ups, Push-Ups via camera)
+  Widget _buildMLSessionCard({
+    required Map<String, dynamic> data,
     bool isLatest = false,
   }) {
+    final exerciseName = data['exerciseType'] as String? ?? 'Pull-Ups';
+    final repCount =
+        data['pullUpCount'] as int? ?? data['pushUpCount'] as int? ?? 0;
+    final timestamp = (data['timestamp'] as Timestamp?)?.toDate();
+
+    // Determine icon based on exercise type
+    IconData exerciseIcon = Icons.fitness_center_rounded;
+    Color exerciseColor = const Color(0xFFFF5C00);
+    if (exerciseName.toLowerCase().contains('push')) {
+      exerciseIcon = Icons.sports_gymnastics_rounded;
+      exerciseColor = const Color(0xFF007AFF);
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: cardBg,
+        borderRadius: BorderRadius.circular(16),
+        border: isLatest
+            ? Border.all(color: primaryBlue.withOpacity(0.5), width: 2)
+            : null,
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: exerciseColor.withOpacity(0.15),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(exerciseIcon, color: exerciseColor, size: 24),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      '$repCount $exerciseName',
+                      style: const TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.purple.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: const Text(
+                        'AI',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.purple,
+                        ),
+                      ),
+                    ),
+                    if (isLatest) ...[
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: primaryBlue,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: const Text(
+                          'Latest',
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  timestamp != null ? _formatDate(timestamp) : 'Unknown date',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.white.withOpacity(0.4),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Icon(
+            Icons.chevron_right_rounded,
+            color: Colors.white.withOpacity(0.3),
+            size: 24,
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Routine session card (Push Day, Leg Day, etc.)
+  Widget _buildRoutineSessionCard({
+    required Map<String, dynamic> data,
+    bool isLatest = false,
+  }) {
+    final workoutName = data['workoutTitle'] as String? ?? 'Workout';
+    final calories = data['calories'] as int? ?? 0;
+    final durationMinutes = data['durationMinutes'] as int? ?? 0;
+    final timestamp = (data['timestamp'] as Timestamp?)?.toDate();
+
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(18),
@@ -327,12 +466,15 @@ class HistoryTab extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    Text(
-                      '$pullUps Pull-Ups',
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.white,
+                    Expanded(
+                      child: Text(
+                        workoutName,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                        ),
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
                     if (isLatest) ...[
@@ -358,16 +500,53 @@ class HistoryTab extends StatelessWidget {
                     ],
                   ],
                 ),
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    Icon(
+                      Icons.timer_outlined,
+                      size: 14,
+                      color: Colors.white.withOpacity(0.5),
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      '$durationMinutes min',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Colors.white.withOpacity(0.5),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Icon(
+                      Icons.local_fire_department_rounded,
+                      size: 14,
+                      color: Colors.white.withOpacity(0.5),
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      '$calories kcal',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Colors.white.withOpacity(0.5),
+                      ),
+                    ),
+                  ],
+                ),
                 const SizedBox(height: 4),
                 Text(
                   timestamp != null ? _formatDate(timestamp) : 'Unknown date',
                   style: TextStyle(
-                    fontSize: 13,
-                    color: Colors.white.withOpacity(0.5),
+                    fontSize: 12,
+                    color: Colors.white.withOpacity(0.4),
                   ),
                 ),
               ],
             ),
+          ),
+          Icon(
+            Icons.chevron_right_rounded,
+            color: Colors.white.withOpacity(0.3),
+            size: 24,
           ),
         ],
       ),

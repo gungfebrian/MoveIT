@@ -5,10 +5,13 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:mobile/screens/onboarding_page.dart';
 import 'package:mobile/providers/theme_provider.dart';
 import 'package:mobile/theme/app_theme.dart';
+// Perbaikan: pastikan mengarah ke nama file yang dihasilkan FlutterFire CLI
 import 'firebase_options.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Inisialisasi Firebase menggunakan DefaultFirebaseOptions dari firebase_options.dart
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
   runApp(
@@ -32,7 +35,7 @@ class MyApp extends StatelessWidget {
           theme: AppTheme.lightTheme,
           darkTheme: AppTheme.darkTheme,
           themeMode: themeProvider.themeMode,
-          // Start directly at Onboarding (Splash removed)
+          // Mulai dari OnboardingScreen
           home: const OnboardingScreen(),
         );
       },

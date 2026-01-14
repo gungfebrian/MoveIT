@@ -1,10 +1,10 @@
-import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
-import 'package:permission_handler/permission_handler.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../theme/app_theme.dart';
-import 'workout_setup_screen.dart';
+import '../models/workout.dart';
+import 'workout_player_screen.dart';
+import 'all_workouts_screen.dart';
 import '../services/auth_service.dart';
 import '../services/streak_service.dart';
 import 'login_page.dart';
@@ -16,7 +16,7 @@ class HomeTab extends StatefulWidget {
   State<HomeTab> createState() => _HomeTabState();
 }
 
-class _HomeTabState extends State<HomeTab> with TickerProviderStateMixin {
+class _HomeTabState extends State<HomeTab> {
   // Theme colors
   final Color primaryOrange = AppTheme.primary;
   final Color darkBg = AppTheme.background;
@@ -113,38 +113,6 @@ class _HomeTabState extends State<HomeTab> with TickerProviderStateMixin {
           ),
         ),
       ),
-      floatingActionButton: Container(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(30),
-          gradient: const LinearGradient(
-            colors: [Color(0xFFFF5C00), Color(0xFFFF8A00)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-          boxShadow: [], // Removed shadow as requested
-          border: Border.all(color: Colors.white.withOpacity(0.2), width: 1),
-        ),
-        child: FloatingActionButton.extended(
-          onPressed: () => _startWorkout(context),
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          highlightElevation: 0,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(30),
-          ),
-          icon: const Icon(Icons.play_arrow_rounded, color: Colors.white),
-          label: const Text(
-            'START WORKOUT',
-            style: TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.w800,
-              fontSize: 15,
-              letterSpacing: 1.0,
-            ),
-          ),
-        ),
-      ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
     );
   }
 
@@ -508,6 +476,53 @@ class _HomeTabState extends State<HomeTab> with TickerProviderStateMixin {
   }
 
   Widget _buildTodaysWorkoutsSection() {
+    // Smart suggestion: rotate workouts based on day of week
+    final today = DateTime.now().weekday;
+    List<WorkoutRoutine> suggestedWorkouts;
+    String suggestionReason;
+
+    switch (today) {
+      case DateTime.monday:
+        suggestedWorkouts = [WorkoutData.pushDay, WorkoutData.absBlast];
+        suggestionReason = 'Monday: Push + Abs';
+        break;
+      case DateTime.tuesday:
+        suggestedWorkouts = [
+          WorkoutData.pullDay,
+          WorkoutData.quickMorningCardio,
+        ];
+        suggestionReason = 'Tuesday: Pull + Cardio';
+        break;
+      case DateTime.wednesday:
+        suggestedWorkouts = [WorkoutData.legDay, WorkoutData.absBlast];
+        suggestionReason = 'Wednesday: Legs + Abs';
+        break;
+      case DateTime.thursday:
+        suggestedWorkouts = [
+          WorkoutData.pushDay,
+          WorkoutData.quickMorningCardio,
+        ];
+        suggestionReason = 'Thursday: Push + Cardio';
+        break;
+      case DateTime.friday:
+        suggestedWorkouts = [WorkoutData.pullDay, WorkoutData.absBlast];
+        suggestionReason = 'Friday: Pull + Abs';
+        break;
+      case DateTime.saturday:
+        suggestedWorkouts = [
+          WorkoutData.legDay,
+          WorkoutData.quickMorningCardio,
+        ];
+        suggestionReason = 'Saturday: Legs + Cardio';
+        break;
+      default: // Sunday
+        suggestedWorkouts = [
+          WorkoutData.quickMorningCardio,
+          WorkoutData.absBlast,
+        ];
+        suggestionReason = 'Sunday: Active Recovery';
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -516,48 +531,91 @@ class _HomeTabState extends State<HomeTab> with TickerProviderStateMixin {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
-                "Today's Workouts",
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w700,
-                  color: Colors.white,
-                ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    "Today's Workouts",
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    suggestionReason,
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: primaryOrange.withOpacity(0.8),
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
               ),
               TextButton(
-                onPressed: () {},
-                child: Text(
-                  'See all',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.white.withOpacity(0.5),
-                  ),
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const AllWorkoutsScreen(),
+                    ),
+                  );
+                },
+                child: Row(
+                  children: [
+                    Text(
+                      'See all',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: primaryOrange,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Icon(
+                      Icons.arrow_forward_ios_rounded,
+                      size: 12,
+                      color: primaryOrange,
+                    ),
+                  ],
                 ),
               ),
             ],
           ),
         ),
         const SizedBox(height: 12),
-        // Workout Cards
-        _buildWorkoutCard(
-          title: 'Quick Morning Cardio',
-          description:
-              'Start your day with energy! A quick cardio session to boost your metabolism',
-          calories: 120,
-          duration: '15 min',
-          difficulty: 'Beginner',
-          exercises: 4,
-        ),
-        const SizedBox(height: 12),
-        _buildWorkoutCard(
-          title: 'Core Crusher',
-          description: 'Build a strong core with targeted exercises',
-          calories: 180,
-          duration: '20 min',
-          difficulty: 'Intermediate',
-          exercises: 6,
-        ),
+        // Suggested Workout Cards (2-3 based on day)
+        ...suggestedWorkouts
+            .map(
+              (workout) => Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: _buildWorkoutCardClickable(workout),
+              ),
+            )
+            .toList(),
       ],
+    );
+  }
+
+  Widget _buildWorkoutCardClickable(WorkoutRoutine workout) {
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => WorkoutPlayerScreen(workout: workout),
+          ),
+        );
+      },
+      child: _buildWorkoutCard(
+        title: workout.title,
+        description: workout.description,
+        calories: workout.calories,
+        duration: workout.durationString,
+        difficulty: workout.difficulty,
+        exercises: workout.exercises.length,
+      ),
     );
   }
 
@@ -722,112 +780,6 @@ class _HomeTabState extends State<HomeTab> with TickerProviderStateMixin {
           ),
         ],
       ),
-    );
-  }
-
-  Future<void> _startWorkout(BuildContext context) async {
-    if (AuthService().currentUser == null) {
-      await _showLoginRequiredDialog(context);
-      return;
-    }
-
-    final status = await Permission.camera.request();
-    if (status.isGranted) {
-      final cameras = await availableCameras();
-      if (cameras.isNotEmpty) {
-        final frontCamera = cameras.firstWhere(
-          (camera) => camera.lensDirection == CameraLensDirection.front,
-          orElse: () => cameras.first,
-        );
-
-        await Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => WorkoutSetupScreen(camera: frontCamera),
-          ),
-        );
-
-        // Update streak after workout
-        _updateStreak();
-      } else {
-        if (context.mounted) {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(const SnackBar(content: Text('No camera found')));
-        }
-      }
-    } else {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Camera permission is required')),
-        );
-      }
-    }
-  }
-
-  Future<void> _showLoginRequiredDialog(BuildContext context) async {
-    return showDialog<void>(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          backgroundColor: cardBg,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-          ),
-          title: const Text(
-            'Login Required',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 20,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          content: Text(
-            'Please login to start a workout and save your results.',
-            style: TextStyle(
-              color: Colors.white.withOpacity(0.7),
-              fontSize: 15,
-            ),
-          ),
-          actions: <Widget>[
-            TextButton(
-              child: Text(
-                'Cancel',
-                style: TextStyle(
-                  color: Colors.white.withOpacity(0.6),
-                  fontSize: 16,
-                ),
-              ),
-              onPressed: () => Navigator.of(context).pop(),
-            ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: primaryOrange,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                elevation: 0,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 20,
-                  vertical: 12,
-                ),
-              ),
-              child: const Text(
-                'Login Now',
-                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
-              ),
-              onPressed: () {
-                Navigator.of(context).pop();
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const LoginPage()),
-                );
-              },
-            ),
-          ],
-        );
-      },
     );
   }
 }

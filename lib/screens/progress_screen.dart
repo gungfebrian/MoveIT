@@ -15,10 +15,10 @@ class ProgressScreen extends StatefulWidget {
 }
 
 class _ProgressScreenState extends State<ProgressScreen> {
-  // Exact colors from reference
-  final Color primaryOrange = const Color(0xFFFF6B4A);
-  final Color pDarkBg = const Color(0xFF000000); // True black background
-  final Color pCardBg = const Color(0xFF1C1C1E); // Dark gray cards
+  // Premium Dark Theme (Consistent with rest of app)
+  final Color primaryOrange = const Color(0xFFFF5C00);
+  final Color pDarkBg = const Color(0xFF08080C);
+  final Color pCardBg = const Color(0xFF12121A);
 
   final StreakService _streakService = StreakService();
   String _selectedPeriod = 'Monthly';
@@ -287,30 +287,35 @@ class _ProgressScreenState extends State<ProgressScreen> {
               ),
             ),
             // Period dropdown
-            Container(
-              padding: const EdgeInsets.fromLTRB(14, 8, 10, 8),
-              decoration: BoxDecoration(
-                color: pCardBg,
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    _selectedPeriod,
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.white.withOpacity(0.9),
+            GestureDetector(
+              onTap: () {
+                _showPeriodPicker();
+              },
+              child: Container(
+                padding: const EdgeInsets.fromLTRB(14, 8, 10, 8),
+                decoration: BoxDecoration(
+                  color: pCardBg,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      _selectedPeriod,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white.withOpacity(0.9),
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 6),
-                  Icon(
-                    Icons.keyboard_arrow_down_rounded,
-                    size: 18,
-                    color: Colors.white.withOpacity(0.5),
-                  ),
-                ],
+                    const SizedBox(width: 6),
+                    Icon(
+                      Icons.keyboard_arrow_down_rounded,
+                      size: 18,
+                      color: Colors.white.withOpacity(0.5),
+                    ),
+                  ],
+                ),
               ),
             ),
           ],
@@ -319,11 +324,17 @@ class _ProgressScreenState extends State<ProgressScreen> {
         const SizedBox(height: 24),
 
         // Bar Chart
-        FutureBuilder<List<int>>(
-          future: _fetchWeeklyData(userId),
+        FutureBuilder<Map<String, dynamic>>(
+          future: _fetchChartData(userId),
           builder: (context, snapshot) {
-            final weeklyData = snapshot.data ?? [0, 0, 0, 0, 0, 0, 0];
-            final maxValue = weeklyData.fold(0, (max, v) => v > max ? v : max);
+            final data = snapshot.data ?? {};
+            final counts =
+                data['counts'] as List<int>? ?? [0, 0, 0, 0, 0, 0, 0];
+            final labels =
+                data['labels'] as List<String>? ??
+                ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+            final maxValue = counts.fold(0, (max, v) => v > max ? v : max);
             final chartMax = maxValue > 0 ? maxValue : 12;
 
             return Container(
@@ -356,16 +367,36 @@ class _ProgressScreenState extends State<ProgressScreen> {
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: List.generate(7, (index) {
-                          final value = weeklyData[index];
+                          final value = counts[index];
+                          final label = labels.length > index
+                              ? labels[index]
+                              : '';
                           final heightPercent = (value / chartMax).clamp(
                             0.0,
                             1.0,
                           );
 
-                          return _buildBar(
-                            label: 'w${index + 1}',
-                            percent: heightPercent,
-                            isActive: value > 0,
+                          return Expanded(
+                            child: GestureDetector(
+                              onTap: () {
+                                ScaffoldMessenger.of(
+                                  context,
+                                ).hideCurrentSnackBar();
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text('$value workouts on $label'),
+                                    duration: const Duration(seconds: 1),
+                                    backgroundColor: pCardBg,
+                                    behavior: SnackBarBehavior.floating,
+                                  ),
+                                );
+                              },
+                              child: _buildBar(
+                                label: label,
+                                percent: heightPercent,
+                                isActive: value > 0,
+                              ),
+                            ),
                           );
                         }),
                       ),
@@ -444,11 +475,28 @@ class _ProgressScreenState extends State<ProgressScreen> {
 
   Future<Map<String, int>> _fetchStats(String userId) async {
     try {
-      final workoutsSnapshot = await FirebaseFirestore.instance
+      // Determine date range based on selected period
+      DateTime? startDate;
+      if (_selectedPeriod == 'Weekly') {
+        startDate = DateTime.now().subtract(const Duration(days: 7));
+      } else if (_selectedPeriod == 'Monthly') {
+        startDate = DateTime.now().subtract(const Duration(days: 30));
+      }
+      // 'All Time' = no filter
+
+      Query<Map<String, dynamic>> query = FirebaseFirestore.instance
           .collection('users')
           .doc(userId)
-          .collection('workouts')
-          .get();
+          .collection('workouts');
+
+      if (startDate != null) {
+        query = query.where(
+          'timestamp',
+          isGreaterThan: Timestamp.fromDate(startDate),
+        );
+      }
+
+      final workoutsSnapshot = await query.get();
 
       int totalWorkouts = workoutsSnapshot.docs.length;
       int totalMinutes = 0;
@@ -456,9 +504,9 @@ class _ProgressScreenState extends State<ProgressScreen> {
 
       for (var doc in workoutsSnapshot.docs) {
         final data = doc.data();
-        final pullUps = data['pullUpCount'] as int? ?? 0;
-        totalMinutes += (pullUps * 3 / 60).round();
-        totalCalories += pullUps * 7;
+        // Use actual workout data
+        totalMinutes += (data['durationMinutes'] as int?) ?? 0;
+        totalCalories += (data['calories'] as int?) ?? 0;
       }
 
       return {
@@ -471,35 +519,89 @@ class _ProgressScreenState extends State<ProgressScreen> {
     }
   }
 
-  Future<List<int>> _fetchWeeklyData(String userId) async {
+  Future<Map<String, dynamic>> _fetchChartData(String userId) async {
     try {
       final now = DateTime.now();
-      final sevenWeeksAgo = now.subtract(const Duration(days: 49));
+
+      // Determine date range and labels based on period
+      DateTime startDate;
+      int periods;
+      bool isWeekly = _selectedPeriod == 'Weekly';
+
+      if (isWeekly) {
+        // Last 7 days
+        periods = 7;
+        startDate = now.subtract(
+          const Duration(days: 6),
+        ); // Start from 6 days ago + today
+      } else {
+        // Monthly (Last 7 weeks as per inspiration)
+        periods = 7;
+        startDate = now.subtract(
+          const Duration(days: 7 * 6),
+        ); // Start from 6 weeks ago + this week
+      }
 
       final workoutsSnapshot = await FirebaseFirestore.instance
           .collection('users')
           .doc(userId)
           .collection('workouts')
-          .where('timestamp', isGreaterThan: Timestamp.fromDate(sevenWeeksAgo))
+          .where(
+            'timestamp',
+            isGreaterThan: Timestamp.fromDate(
+              startDate.subtract(const Duration(days: 1)),
+            ),
+          ) // Buffer
           .get();
 
-      final weekCounts = List.filled(7, 0);
+      final counts = List.filled(periods, 0);
+      final weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
       for (var doc in workoutsSnapshot.docs) {
         final data = doc.data();
         final timestamp = data['timestamp'] as Timestamp?;
         if (timestamp != null) {
           final date = timestamp.toDate();
-          final weeksAgo = now.difference(date).inDays ~/ 7;
-          if (weeksAgo >= 0 && weeksAgo < 7) {
-            weekCounts[6 - weeksAgo]++;
+
+          if (isWeekly) {
+            // Calculate day usage
+            final diff = date.difference(startDate).inDays;
+            if (diff >= 0 && diff < 7) {
+              counts[diff]++;
+            }
+          } else {
+            // Calculate week usage
+            final diff = now.difference(date).inDays;
+            final weekIndex = (diff / 7).floor();
+            if (weekIndex >= 0 && weekIndex < 7) {
+              counts[6 - weekIndex]++; // Reverse order so w7 is current
+            }
           }
         }
       }
 
-      return weekCounts;
+      List<String> labels = [];
+      if (isWeekly) {
+        // Generate day labels (e.g. Mon, Tue)
+        for (int i = 0; i < 7; i++) {
+          final date = startDate.add(Duration(days: i));
+          labels.add(weekdays[date.weekday - 1]);
+        }
+      } else {
+        // Generate week labels (w1...w7)
+        for (int i = 1; i <= 7; i++) {
+          labels.add('w$i');
+        }
+      }
+
+      return {'counts': counts, 'labels': labels};
     } catch (e) {
-      return [0, 0, 0, 0, 0, 0, 0];
+      return {
+        'counts': [0, 0, 0, 0, 0, 0, 0],
+        'labels': _selectedPeriod == 'Weekly'
+            ? ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+            : ['w1', 'w2', 'w3', 'w4', 'w5', 'w6', 'w7'],
+      };
     }
   }
 
@@ -527,6 +629,75 @@ class _ProgressScreenState extends State<ProgressScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  void _showPeriodPicker() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: pCardBg,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (context) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                const Text(
+                  'Select Period',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                _buildPeriodOption('Weekly', Icons.calendar_view_week_rounded),
+                _buildPeriodOption('Monthly', Icons.calendar_month_rounded),
+                _buildPeriodOption('All Time', Icons.all_inclusive_rounded),
+                const SizedBox(height: 8),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildPeriodOption(String period, IconData icon) {
+    final isSelected = _selectedPeriod == period;
+    return ListTile(
+      onTap: () {
+        setState(() => _selectedPeriod = period);
+        Navigator.pop(context);
+      },
+      leading: Icon(
+        icon,
+        color: isSelected ? primaryOrange : Colors.white.withOpacity(0.5),
+      ),
+      title: Text(
+        period,
+        style: TextStyle(
+          fontSize: 16,
+          fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+          color: isSelected ? primaryOrange : Colors.white,
+        ),
+      ),
+      trailing: isSelected
+          ? Icon(Icons.check_circle_rounded, color: primaryOrange)
+          : null,
     );
   }
 }

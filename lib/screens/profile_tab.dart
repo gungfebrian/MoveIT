@@ -1,17 +1,11 @@
-// lib/screens/profile_tab.dart
-
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../theme/app_theme.dart';
-import '../providers/theme_provider.dart';
 import '../services/auth_service.dart';
-import '../services/settings_service.dart';
 import 'login_page.dart';
-import 'edit_profile_page.dart';
+import 'settings_screen.dart';
 
 class ProfileTab extends StatefulWidget {
   const ProfileTab({super.key});
@@ -22,458 +16,360 @@ class ProfileTab extends StatefulWidget {
 
 class _ProfileTabState extends State<ProfileTab> {
   String? _localPhotoPath;
-  String? _avatarEmoji;
-  PoseModelChoice _poseModelChoice = PoseModelChoice.accurate;
+  Map<String, dynamic> _userStats = {'workouts': 0, 'streak': 0};
 
-  // Using theme colors
-  final Color backgroundColor = AppTheme.background;
-  final Color cardColor = AppTheme.card;
-  final Color accentColor = AppTheme.primary;
-  final Color textColor = AppTheme.textPrimary;
-  final Color subtitleColor = AppTheme.textSecondary;
+  // Theme Colors
+  static const Color pDarkBg = Color(0xFF08080C);
+  static const Color pCardBg = Color(0xFF12121A);
+  static const Color primaryOrange = Color(0xFFFF5C00);
 
   @override
   void initState() {
     super.initState();
     _loadProfileData();
-    _loadPoseModelChoice();
+    _loadUserStats();
   }
 
   Future<void> _loadProfileData() async {
-    final user = AuthService().currentUser;
+    final user = FirebaseAuth.instance.currentUser;
     if (user != null) {
       final prefs = await SharedPreferences.getInstance();
       final photoPath = prefs.getString('profile_photo_${user.uid}');
 
-      try {
-        final doc = await FirebaseFirestore.instance
-            .collection('users')
-            .doc(user.uid)
-            .get();
-
-        if (doc.exists) {
-          setState(() {
-            if (photoPath != null && File(photoPath).existsSync()) {
-              _localPhotoPath = photoPath;
-            }
-            _avatarEmoji = doc.data()?['avatar'];
-          });
-        }
-      } catch (e) {
-        debugPrint('Error loading profile data: $e');
+      if (photoPath != null && File(photoPath).existsSync()) {
+        setState(() {
+          _localPhotoPath = photoPath;
+        });
       }
     }
   }
 
-  Future<void> _loadPoseModelChoice() async {
-    final service = SettingsService();
-    final choice = await service.getPoseModelChoice();
-    if (!mounted) return;
-    setState(() => _poseModelChoice = choice);
-  }
+  Future<void> _loadUserStats() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      // Fetch stats (mock or real)
+      // For now, let's just get workout count
+      final workouts = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .collection('workouts')
+          .count()
+          .get();
 
-  Future<void> _choosePoseModel() async {
-    final selected = await showDialog<PoseModelChoice>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: cardColor,
-        title: Text('Pose Model', style: TextStyle(color: textColor)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            RadioListTile<PoseModelChoice>(
-              title: Text(
-                'Accurate (better quality)',
-                style: TextStyle(color: textColor),
-              ),
-              value: PoseModelChoice.accurate,
-              groupValue: _poseModelChoice,
-              onChanged: (v) => Navigator.of(ctx).pop(v),
-              activeColor: accentColor,
-            ),
-            RadioListTile<PoseModelChoice>(
-              title: Text(
-                'Base (smaller, faster)',
-                style: TextStyle(color: textColor),
-              ),
-              value: PoseModelChoice.base,
-              groupValue: _poseModelChoice,
-              onChanged: (v) => Navigator.of(ctx).pop(v),
-              activeColor: accentColor,
-            ),
-          ],
-        ),
-      ),
-    );
-    if (selected != null) {
-      await SettingsService().setPoseModelChoice(selected);
-      if (!mounted) return;
-      setState(() => _poseModelChoice = selected);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Pose model preference saved'),
-          backgroundColor: accentColor,
-        ),
-      );
+      setState(() {
+        _userStats = {
+          'workouts': workouts.count,
+          'streak': 0, // Gets updated by StreakService usually
+        };
+      });
     }
   }
 
-  Widget _buildProfilePhoto() {
-    if (_localPhotoPath != null) {
-      return Container(
-        width: 120,
-        height: 120,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          border: Border.all(color: accentColor.withOpacity(0.3), width: 3),
-          boxShadow: [
-            BoxShadow(
-              color: accentColor.withOpacity(0.2),
-              blurRadius: 20,
-              spreadRadius: 5,
+  Future<void> _handleManageData() async {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: pCardBg,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text(
+          'Manage Data',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
+        ),
+        content: const Text(
+          'You can clear your workout history here. This action cannot be undone.',
+          style: TextStyle(color: Colors.white70),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(
+              'Cancel',
+              style: TextStyle(color: Colors.white.withOpacity(0.5)),
             ),
-          ],
-        ),
-        child: CircleAvatar(
-          radius: 60,
-          backgroundImage: FileImage(File(_localPhotoPath!)),
-        ),
-      );
-    } else if (_avatarEmoji != null) {
-      return Container(
-        width: 120,
-        height: 120,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          border: Border.all(color: accentColor.withOpacity(0.3), width: 3),
-          boxShadow: [
-            BoxShadow(
-              color: accentColor.withOpacity(0.2),
-              blurRadius: 20,
-              spreadRadius: 5,
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              await _clearWorkoutHistory();
+            },
+            child: const Text(
+              'Clear History',
+              style: TextStyle(color: Colors.redAccent),
             ),
-          ],
-        ),
-        child: CircleAvatar(
-          radius: 60,
-          backgroundColor: const Color(0xFFE8C5A5),
-          child: Text(_avatarEmoji!, style: const TextStyle(fontSize: 60)),
-        ),
-      );
-    } else {
-      return Container(
-        width: 120,
-        height: 120,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          border: Border.all(color: accentColor.withOpacity(0.3), width: 3),
-          boxShadow: [
-            BoxShadow(
-              color: accentColor.withOpacity(0.2),
-              blurRadius: 20,
-              spreadRadius: 5,
-            ),
-          ],
-        ),
-        child: CircleAvatar(
-          radius: 60,
-          backgroundColor: const Color(0xFFE8C5A5),
-          child: Icon(Icons.person, size: 60, color: cardColor),
-        ),
-      );
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _clearWorkoutHistory() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    try {
+      final batch = FirebaseFirestore.instance.batch();
+      final snapshots = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .collection('workouts')
+          .get();
+
+      for (var doc in snapshots.docs) {
+        batch.delete(doc.reference);
+      }
+
+      await batch.commit();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Workout history cleared'),
+            backgroundColor: primaryOrange,
+          ),
+        );
+        _loadUserStats(); // Refresh stats
+      }
+    } catch (e) {
+      debugPrint('Error clearing history: $e');
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final themeProvider = Provider.of<ThemeProvider>(context);
-    final User? user = AuthService().currentUser;
-    final String displayName = user?.displayName ?? 'User';
-    final String email = user?.email ?? 'Not registered';
+    final user = FirebaseAuth.instance.currentUser;
+    final displayName = user?.displayName ?? 'Athlete';
+    final email = user?.email ?? 'No email';
 
     return Scaffold(
-      backgroundColor: backgroundColor,
+      backgroundColor: pDarkBg,
       body: SafeArea(
         child: SingleChildScrollView(
+          physics: const BouncingScrollPhysics(),
+          padding: const EdgeInsets.symmetric(horizontal: 24),
           child: Column(
-            children: <Widget>[
+            children: [
               const SizedBox(height: 20),
-              // Profile Title
-              Text(
-                'Profile',
-                style: TextStyle(
-                  fontSize: 28,
-                  fontWeight: FontWeight.bold,
-                  color: textColor,
+              // Profile Header
+              _buildProfileHeader(displayName, email),
+              const SizedBox(height: 32),
+
+              // Stats Row
+              _buildStatsRow(),
+              const SizedBox(height: 32),
+
+              // Menu Options
+              Container(
+                decoration: BoxDecoration(
+                  color: pCardBg,
+                  borderRadius: BorderRadius.circular(24),
+                  border: Border.all(color: Colors.white.withOpacity(0.05)),
                 ),
-              ),
-              const SizedBox(height: 30),
-
-              // Profile Photo with Glow Effect
-              _buildProfilePhoto(),
-              const SizedBox(height: 20),
-
-              // User Name
-              Text(
-                displayName,
-                style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  color: textColor,
-                ),
-              ),
-              const SizedBox(height: 5),
-
-              // User Email
-              Text(email, style: TextStyle(fontSize: 16, color: subtitleColor)),
-              const SizedBox(height: 40),
-
-              // Menu Card
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24.0),
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: cardColor,
-                    borderRadius: BorderRadius.circular(25),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.2),
-                        blurRadius: 20,
-                        offset: const Offset(0, 10),
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    children: [
-                      // Dark Mode Toggle
-                      ListTile(
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 24,
-                          vertical: 12,
-                        ),
-                        leading: Icon(
-                          Icons.dark_mode_rounded,
-                          color: accentColor,
-                          size: 28,
-                        ),
-                        title: Text(
-                          'Dark Mode',
-                          style: TextStyle(
-                            color: textColor,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                        trailing: Transform.scale(
-                          scale: 0.9,
-                          child: Switch(
-                            value: themeProvider.isDarkMode,
-                            onChanged: (value) {
-                              themeProvider.toggleTheme();
-                            },
-                            activeThumbColor: Colors.white,
-                            activeTrackColor: accentColor,
-                            inactiveThumbColor: Colors.grey,
-                            inactiveTrackColor: Colors.grey.shade700,
-                          ),
-                        ),
-                      ),
-                      Divider(
-                        height: 1,
-                        thickness: 1,
-                        indent: 24,
-                        endIndent: 24,
-                        color: subtitleColor.withOpacity(0.2),
-                      ),
-
-                      // Edit Profile
-                      ListTile(
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 24,
-                          vertical: 12,
-                        ),
-                        leading: Icon(
-                          Icons.edit_rounded,
-                          color: accentColor,
-                          size: 28,
-                        ),
-                        title: Text(
-                          'Edit Profile',
-                          style: TextStyle(
-                            color: textColor,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                        trailing: Icon(
-                          Icons.chevron_right,
-                          color: subtitleColor,
-                        ),
-                        onTap: () async {
-                          final result = await Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => const EditProfilePage(),
-                            ),
-                          );
-                          if (result == true) {
-                            _loadProfileData();
-                          }
-                        },
-                      ),
-                      Divider(
-                        height: 1,
-                        thickness: 1,
-                        indent: 24,
-                        endIndent: 24,
-                        color: subtitleColor.withOpacity(0.2),
-                      ),
-
-                      // Settings
-                      ListTile(
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 24,
-                          vertical: 12,
-                        ),
-                        leading: Icon(
-                          Icons.settings_rounded,
-                          color: accentColor,
-                          size: 28,
-                        ),
-                        title: Text(
-                          'Pose Model',
-                          style: TextStyle(
-                            color: textColor,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                        subtitle: Text(
-                          _poseModelChoice == PoseModelChoice.accurate
-                              ? 'Accurate (better quality)'
-                              : 'Base (smaller, faster)',
-                          style: TextStyle(fontSize: 13, color: subtitleColor),
-                        ),
-                        trailing: Icon(
-                          Icons.chevron_right,
-                          color: subtitleColor,
-                        ),
-                        onTap: _choosePoseModel,
-                      ),
-                      Divider(
-                        height: 1,
-                        thickness: 1,
-                        indent: 24,
-                        endIndent: 24,
-                        color: subtitleColor.withOpacity(0.2),
-                      ),
-
-                      // Settings
-                      ListTile(
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 24,
-                          vertical: 12,
-                        ),
-                        leading: Icon(
-                          Icons.settings_rounded,
-                          color: accentColor,
-                          size: 28,
-                        ),
-                        title: Text(
-                          'Settings',
-                          style: TextStyle(
-                            color: textColor,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                        trailing: Icon(
-                          Icons.chevron_right,
-                          color: subtitleColor,
-                        ),
-                        onTap: () {
-                          // Navigate to settings page
-                        },
-                      ),
-                      Divider(
-                        height: 1,
-                        thickness: 1,
-                        indent: 24,
-                        endIndent: 24,
-                        color: subtitleColor.withOpacity(0.2),
-                      ),
-
-                      // Pull-Up History
-                      ListTile(
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 24,
-                          vertical: 12,
-                        ),
-                        leading: Icon(
-                          Icons.history_rounded,
-                          color: accentColor,
-                          size: 28,
-                        ),
-                        title: Text(
-                          'Pull-Up History',
-                          style: TextStyle(
-                            color: textColor,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                        trailing: Icon(
-                          Icons.chevron_right,
-                          color: subtitleColor,
-                        ),
-                        onTap: () {
-                          // Navigate to history page
-                        },
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 30),
-
-              // Logout Button
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24.0),
-                child: SizedBox(
-                  width: double.infinity,
-                  height: 56,
-                  child: ElevatedButton.icon(
-                    onPressed: () async {
-                      await AuthService().signOut();
-                      Navigator.pushAndRemoveUntil(
+                child: Column(
+                  children: [
+                    _buildMenuItem(
+                      'Settings',
+                      Icons.settings_outlined,
+                      onTap: () => Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (context) => const LoginPage(),
+                          builder: (context) => const SettingsScreen(),
                         ),
-                        (Route<dynamic> route) => false,
-                      );
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF4A1A1A),
-                      foregroundColor: const Color(0xFFFF5555),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      elevation: 0,
-                    ),
-                    icon: const Icon(Icons.logout_rounded, size: 24),
-                    label: const Text(
-                      'Logout',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
                       ),
                     ),
-                  ),
+                    _buildDivider(),
+                    _buildMenuItem(
+                      'Manage Data',
+                      Icons.storage_rounded,
+                      onTap: _handleManageData,
+                    ),
+                    _buildDivider(),
+                    _buildMenuItem(
+                      'Help & Support',
+                      Icons.help_outline_rounded,
+                      onTap: () {},
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(height: 40),
+              const SizedBox(height: 24),
+
+              // Logout Button
+              _buildLogoutButton(),
+              const SizedBox(height: 100), // Space for navbar
             ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildProfileHeader(String name, String email) {
+    return Column(
+      children: [
+        Container(
+          width: 120,
+          height: 120,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            border: Border.all(color: primaryOrange, width: 3),
+            boxShadow: [
+              BoxShadow(
+                color: primaryOrange.withOpacity(0.3),
+                blurRadius: 30,
+                spreadRadius: 5,
+              ),
+            ],
+            color: pCardBg,
+          ),
+          child: ClipOval(
+            child: _localPhotoPath != null
+                ? Image.file(File(_localPhotoPath!), fit: BoxFit.cover)
+                : const Icon(
+                    Icons.person_rounded,
+                    size: 60,
+                    color: Colors.white,
+                  ),
+          ),
+        ),
+        const SizedBox(height: 20),
+        Text(
+          name,
+          style: const TextStyle(
+            fontSize: 24,
+            fontWeight: FontWeight.w700,
+            color: Colors.white,
+            fontFamily: 'Inter',
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          email,
+          style: TextStyle(
+            fontSize: 14,
+            color: Colors.white.withOpacity(0.5),
+            fontFamily: 'Inter',
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildStatsRow() {
+    return Row(
+      children: [
+        Expanded(
+          child: _buildStatItem('Workouts', '${_userStats['workouts']}'),
+        ),
+        Container(width: 1, height: 40, color: Colors.white.withOpacity(0.1)),
+        Expanded(child: _buildStatItem('Check-in', 'Daily')),
+      ],
+    );
+  }
+
+  Widget _buildStatItem(String label, String value) {
+    return Column(
+      children: [
+        Text(
+          value,
+          style: const TextStyle(
+            fontSize: 24,
+            fontWeight: FontWeight.w800,
+            color: primaryOrange,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w500,
+            color: Colors.white.withOpacity(0.5),
+            letterSpacing: 0.5,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMenuItem(
+    String title,
+    IconData icon, {
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(24),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.05),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(icon, color: Colors.white, size: 20),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+            Icon(
+              Icons.chevron_right_rounded,
+              color: Colors.white.withOpacity(0.3),
+              size: 20,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDivider() {
+    return Divider(
+      height: 1,
+      thickness: 1,
+      color: Colors.white.withOpacity(0.05),
+      indent: 68,
+      endIndent: 20,
+    );
+  }
+
+  Widget _buildLogoutButton() {
+    return SizedBox(
+      width: double.infinity,
+      child: TextButton(
+        onPressed: () async {
+          await AuthService().signOut();
+          if (mounted) {
+            Navigator.pushAndRemoveUntil(
+              context,
+              MaterialPageRoute(builder: (context) => const LoginPage()),
+              (route) => false,
+            );
+          }
+        },
+        style: TextButton.styleFrom(
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          backgroundColor: const Color(0xFF2A1215), // Dark Red
+        ),
+        child: const Text(
+          'Log Out',
+          style: TextStyle(
+            color: Color(0xFFFF4545),
+            fontSize: 16,
+            fontWeight: FontWeight.w700,
           ),
         ),
       ),

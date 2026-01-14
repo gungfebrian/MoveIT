@@ -1,6 +1,7 @@
 // lib/screens/home_page.dart
 
 import 'package:flutter/material.dart';
+import 'dart:ui' as ui;
 import '../theme/app_theme.dart';
 import 'login_page.dart';
 import 'home_tab.dart';
@@ -8,6 +9,9 @@ import 'history_tab.dart';
 import 'progress_screen.dart';
 import 'profile_tab.dart';
 import '../services/auth_service.dart';
+
+import 'package:camera/camera.dart'; // Added for camera access
+import 'workout_setup_screen.dart'; // Added for navigation
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -88,11 +92,10 @@ class _HomePageState extends State<HomePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor:
-          AppTheme.background, // Match Login Page Solid Black via Theme
+      backgroundColor: AppTheme.background,
       body: Stack(
         children: [
-          // Ambient Glow (Top Right) - Matches Login Page
+          // Ambient Glow (Top Right)
           Positioned(
             top: -100,
             right: -100,
@@ -113,102 +116,124 @@ class _HomePageState extends State<HomePage> {
             ),
           ),
 
-          // Content
+          // Main Content
           _pages[_selectedIndex],
-        ],
-      ),
-      bottomNavigationBar: Container(
-        decoration: BoxDecoration(
-          color: cardBg.withOpacity(0.95), // Slight glass effect
-          border: Border(
-            top: BorderSide(color: Colors.white.withOpacity(0.05), width: 1),
-          ),
-        ),
-        child: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                _buildNavItem(
-                  icon: Icons.home_rounded,
-                  label: 'Home',
-                  index: 0,
+
+          // Floating Glass Bottom Navigation
+          Align(
+            alignment: Alignment.bottomCenter,
+            child: Container(
+              margin: const EdgeInsets.fromLTRB(20, 0, 20, 30),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(30),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.3),
+                    blurRadius: 20,
+                    offset: const Offset(0, 10),
+                  ),
+                ],
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(30),
+                child: BackdropFilter(
+                  filter: ui.ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 12,
+                    ),
+                    decoration: BoxDecoration(
+                      color: cardBg.withOpacity(0.85),
+                      borderRadius: BorderRadius.circular(30),
+                      border: Border.all(
+                        color: Colors.white.withOpacity(0.1),
+                        width: 1,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        _buildNavItem(Icons.home_rounded, 0),
+                        _buildNavItem(Icons.fitness_center_rounded, 1),
+                        // Central Action Button
+                        GestureDetector(
+                          onTap: _onStartWorkout,
+                          child: Container(
+                            width: 56, // Slightly larger
+                            height: 56,
+                            decoration: BoxDecoration(
+                              gradient: const LinearGradient(
+                                colors: [Color(0xFFFF5C00), Color(0xFFFF8A00)],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              ),
+                              shape: BoxShape.circle,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: const Color(
+                                    0xFFFF5C00,
+                                  ).withOpacity(0.4),
+                                  blurRadius: 15,
+                                  offset: const Offset(0, 8),
+                                ),
+                              ],
+                              border: Border.all(
+                                color: Colors.white.withOpacity(0.2),
+                                width: 1,
+                              ),
+                            ),
+                            child: const Icon(
+                              Icons.add_rounded, // Changed from play_arrow
+                              color: Colors.white,
+                              size: 32,
+                            ),
+                          ),
+                        ),
+                        _buildNavItem(Icons.pie_chart_rounded, 2),
+                        _buildNavItem(Icons.person_rounded, 3),
+                      ],
+                    ),
+                  ),
                 ),
-                _buildNavItem(
-                  icon: Icons.fitness_center_rounded,
-                  label: 'Workouts',
-                  index: 1,
-                ),
-                _buildNavItem(
-                  icon: Icons.pie_chart_rounded,
-                  label: 'Progress',
-                  index: 2,
-                ),
-                _buildNavItem(
-                  icon: Icons.person_rounded,
-                  label: 'Profile',
-                  index: 3,
-                ),
-              ],
+              ),
             ),
           ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildNavItem(IconData icon, int index) {
+    final isSelected = _selectedIndex == index;
+
+    return GestureDetector(
+      onTap: () => _onItemTapped(index),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.all(12), // Uniform padding
+        decoration: BoxDecoration(
+          color: isSelected
+              ? primaryOrange.withOpacity(0.1) // Subtler background
+              : Colors.transparent,
+          shape: BoxShape.circle, // Circular highlight
+        ),
+        child: Icon(
+          icon,
+          color: isSelected ? primaryOrange : Colors.white.withOpacity(0.5),
+          size: 26, // Slightly larger icons
         ),
       ),
     );
   }
 
-  Widget _buildNavItem({
-    required IconData icon,
-    required String label,
-    required int index,
-  }) {
-    final isSelected = _selectedIndex == index;
-
-    return Expanded(
-      child: InkWell(
-        onTap: () => _onItemTapped(index),
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  boxShadow: isSelected
-                      ? [
-                          BoxShadow(
-                            color: primaryOrange.withOpacity(0.5),
-                            blurRadius: 20,
-                            spreadRadius: 5,
-                          ),
-                        ]
-                      : null,
-                ),
-                child: Icon(
-                  icon,
-                  color: isSelected
-                      ? primaryOrange
-                      : Colors.white.withOpacity(0.4),
-                  size: 26,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w500,
-                  color: isSelected
-                      ? primaryOrange
-                      : Colors.white.withOpacity(0.4),
-                ),
-              ),
-            ],
-          ),
-        ),
+  void _onStartWorkout() async {
+    final cameras = await availableCameras();
+    if (!mounted) return;
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => WorkoutSetupScreen(camera: cameras.first),
       ),
     );
   }
