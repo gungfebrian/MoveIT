@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
 import 'camera_screen.dart';
+import 'pushup_camera_screen.dart';
+import 'situp_camera_screen.dart';
 
 class WorkoutSetupScreen extends StatefulWidget {
   final CameraDescription camera;
@@ -23,19 +25,24 @@ class _WorkoutSetupScreenState extends State<WorkoutSetupScreen> {
   String _goalType = 'reps'; // 'reps' or 'time'
   int _targetReps = 10;
 
-  final List<String> _exercises = ['Pull-Up', 'Push-Up', 'Squat'];
+  final List<String> _exercises = ['Pull-Up', 'Push-Up', 'Sit-Up'];
   final List<int> _repsOptions = [8, 10, 12, 15, 20];
 
   void _startWorkout() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => CameraScreen(
-          camera: widget.camera,
-          exerciseType: _selectedExercise,
-        ),
-      ),
-    );
+    Widget screen;
+    switch (_selectedExercise) {
+      case 'Push-Up':
+        screen = PushUpCameraScreen(camera: widget.camera);
+        break;
+      case 'Sit-Up':
+        screen = SitUpCameraScreen(camera: widget.camera);
+        break;
+      case 'Pull-Up':
+      default:
+        screen = CameraScreen(camera: widget.camera, exerciseType: 'Pull-Up');
+        break;
+    }
+    Navigator.push(context, MaterialPageRoute(builder: (context) => screen));
   }
 
   @override
@@ -273,7 +280,7 @@ class _WorkoutSetupScreenState extends State<WorkoutSetupScreen> {
     else if (exercise == 'Push-Up')
       icon = Icons.accessibility_new;
     else
-      icon = Icons.directions_run;
+      icon = Icons.self_improvement; // Sit-Up icon (person sitting)
 
     return GestureDetector(
       onTap: () => setState(() => _selectedExercise = exercise),

@@ -18,16 +18,16 @@ migrate_working_dir/
 *.iws
 .idea/
 
-# The .vscode folder contains launch configuration and tasks you configure in
-# VS Code which you may wish to be included in version control, so this line
-# is commented out by default.
+# VS Code
 #.vscode/
 
 # Flutter/Dart/Pub related
 **/doc/api/
 **/ios/Flutter/.last_build_id
 .dart_tool/
+.flutter-plugins
 .flutter-plugins-dependencies
+.packages
 .pub-cache/
 .pub/
 /build/
@@ -39,35 +39,33 @@ app.*.symbols
 # Obfuscation related
 app.*.map.json
 
-# Android Studio will place build artifacts here
+# Android
 /android/app/debug
 /android/app/profile
 /android/app/release
-
-# Tambahkan ini di bagian Flutter/Dart
-.flutter-plugins
-.packages
-
-# Tambahkan ini di bagian Android (Sangat Penting!)
-# local.properties berisi path SDK di laptopmu, kalau di-upload bakal bikin build error di laptop lain
 **/android/local.properties
 **/android/key.properties
 **/*.keystore
 **/*.jks
 
-# Tambahkan ini di bagian iOS (Penting untuk Apple Dev Academy)
+# iOS
 **/ios/Flutter/Generated.xcconfig
 **/ios/Flutter/flutter_export_environment.sh
 **/ios/Pods/
 **/ios/.generated_files/
 
-# Firebase
+# Firebase (sensitive files)
 **/android/app/google-services.json
 **/ios/Runner/GoogleService-Info.plist
 **/ios/Firebase/
 .firebaserc
 firebase-debug.log
 *ui-debug.log
-
-# Jika kamu menggunakan FlutterFire CLI
 lib/firebase_options.dart
+
+# Backup folders
+*_backup/
+android_backup/
+
+# macOS
+**/.DS_Store

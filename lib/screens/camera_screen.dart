@@ -53,64 +53,66 @@ class PosePainter extends CustomPainter {
     void drawLine(PoseLandmark? start, PoseLandmark? end, Color color) {
       if (start == null || end == null) return;
 
-      final linePaint = Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 5.0
-        ..color = color;
+      final startOffset = Offset(translateX(start.x), translateY(start.y));
+      final endOffset = Offset(translateX(end.x), translateY(end.y));
 
-      final startX = translateX(start.x);
-      final startY = translateY(start.y);
-      final endX = translateX(end.x);
-      final endY = translateY(end.y);
-
-      canvas.drawLine(Offset(startX, startY), Offset(endX, endY), linePaint);
+      // Outer glow
+      canvas.drawLine(
+        startOffset,
+        endOffset,
+        Paint()
+          ..color = color.withAlpha(60)
+          ..strokeWidth = 14.0
+          ..strokeCap = StrokeCap.round,
+      );
+      // Main line
+      canvas.drawLine(
+        startOffset,
+        endOffset,
+        Paint()
+          ..color = color
+          ..strokeWidth = 5.0
+          ..strokeCap = StrokeCap.round,
+      );
     }
 
     void drawPoint(PoseLandmark? landmark, Color color) {
       if (landmark == null) return;
+      final offset = Offset(translateX(landmark.x), translateY(landmark.y));
 
-      final pointPaintColored = Paint()
-        ..style = PaintingStyle.fill
-        ..color = color;
-
-      final x = translateX(landmark.x);
-      final y = translateY(landmark.y);
-
-      canvas.drawCircle(Offset(x, y), 12, pointPaintColored);
-
-      // Draw white border
-      final borderPaint = Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 2.0
-        ..color = Colors.white;
-      canvas.drawCircle(Offset(x, y), 12, borderPaint);
+      // Outer glow
+      canvas.drawCircle(offset, 16, Paint()..color = color.withAlpha(50));
+      // Inner circle
+      canvas.drawCircle(offset, 10, Paint()..color = color);
+      // Center white dot
+      canvas.drawCircle(offset, 4, Paint()..color = Colors.white);
     }
 
     // Draw all landmarks
     final landmarks = pose.landmarks;
 
-    // Left arm - RED
+    // Left arm - BLUE (Pull-up theme)
     drawLine(
       landmarks[PoseLandmarkType.leftShoulder],
       landmarks[PoseLandmarkType.leftElbow],
-      Colors.red,
+      const Color(0xFF2196F3),
     );
     drawLine(
       landmarks[PoseLandmarkType.leftElbow],
       landmarks[PoseLandmarkType.leftWrist],
-      Colors.red,
+      const Color(0xFF2196F3),
     );
 
-    // Right arm - BLUE
+    // Right arm - BLUE (Pull-up theme)
     drawLine(
       landmarks[PoseLandmarkType.rightShoulder],
       landmarks[PoseLandmarkType.rightElbow],
-      Colors.blue,
+      const Color(0xFF2196F3),
     );
     drawLine(
       landmarks[PoseLandmarkType.rightElbow],
       landmarks[PoseLandmarkType.rightWrist],
-      Colors.blue,
+      const Color(0xFF2196F3),
     );
 
     // Shoulders - YELLOW
@@ -161,14 +163,20 @@ class PosePainter extends CustomPainter {
       Colors.purple,
     );
 
-    // Draw all points with different colors
-    drawPoint(landmarks[PoseLandmarkType.leftShoulder], Colors.red);
-    drawPoint(landmarks[PoseLandmarkType.leftElbow], Colors.red);
-    drawPoint(landmarks[PoseLandmarkType.leftWrist], Colors.red);
+    // Draw all points with blue theme for Pull-Up
+    drawPoint(
+      landmarks[PoseLandmarkType.leftShoulder],
+      const Color(0xFF2196F3),
+    );
+    drawPoint(landmarks[PoseLandmarkType.leftElbow], const Color(0xFF2196F3));
+    drawPoint(landmarks[PoseLandmarkType.leftWrist], const Color(0xFF2196F3));
 
-    drawPoint(landmarks[PoseLandmarkType.rightShoulder], Colors.blue);
-    drawPoint(landmarks[PoseLandmarkType.rightElbow], Colors.blue);
-    drawPoint(landmarks[PoseLandmarkType.rightWrist], Colors.blue);
+    drawPoint(
+      landmarks[PoseLandmarkType.rightShoulder],
+      const Color(0xFF2196F3),
+    );
+    drawPoint(landmarks[PoseLandmarkType.rightElbow], const Color(0xFF2196F3));
+    drawPoint(landmarks[PoseLandmarkType.rightWrist], const Color(0xFF2196F3));
 
     drawPoint(landmarks[PoseLandmarkType.leftHip], Colors.green);
     drawPoint(landmarks[PoseLandmarkType.rightHip], Colors.green);
@@ -189,7 +197,7 @@ class _CameraScreenState extends State<CameraScreen> {
   late Future<void> _initializeControllerFuture;
   late PoseDetector _poseDetector;
   bool _isProcessing = false;
-  int _pullUpCount = 0;
+  int _repCount = 0;
   bool _isInUpPosition = false;
   Pose? _currentPose;
   int _frameCount = 0;
@@ -201,12 +209,19 @@ class _CameraScreenState extends State<CameraScreen> {
   bool _isProperForm = false;
   double _repQuality = 0.0;
 
-  // Threshold dan konstanta
+  // Threshold dan konstanta (Pull-up)
   static const double _minArmAngle = 60.0;
   static const double _maxShoulderDiff = 0.1;
   static const double _minConfidence = 0.7;
   static const Duration _minRepDuration = Duration(milliseconds: 1500);
   DateTime? _lastRepTime;
+
+  // Push-up state (from Python algorithm)
+  int _pushUpDirection = 0; // 0 = down, 1 = up
+  int _pushUpForm = 0; // 0 = not ready, 1 = form validated
+
+  // Sit-up state (from Python algorithm)
+  String _sitUpStage = 'down'; // 'down' or 'up'
 
   @override
   void initState() {
@@ -220,11 +235,24 @@ class _CameraScreenState extends State<CameraScreen> {
 
   @override
   void dispose() {
-    debugPrint('🛑 Disposing camera');
-    _disposeCamera();
-    _controller.dispose();
-    _poseDetector.close();
+    debugPrint('🛑 Disposing Pull-Up camera');
+    _disposeResourcesAsync();
     super.dispose();
+  }
+
+  Future<void> _disposeResourcesAsync() async {
+    try {
+      _disposeCamera();
+      await _controller.dispose();
+    } catch (e) {
+      debugPrint('⚠️ Camera dispose error: $e');
+    }
+    try {
+      await _poseDetector.close();
+    } catch (e) {
+      debugPrint('⚠️ PoseDetector dispose error: $e');
+    }
+    debugPrint('✅ Pull-Up resources released');
   }
 
   Future<void> _initCameraAndPose() async {
@@ -282,6 +310,12 @@ class _CameraScreenState extends State<CameraScreen> {
     _isProcessing = true;
     _frameCount++;
 
+    // Skip frames for better performance (process every 3rd frame)
+    if (_frameCount % 3 != 0) {
+      _isProcessing = false;
+      return;
+    }
+
     try {
       final WriteBuffer allBytes = WriteBuffer();
       for (final Plane plane in image.planes) {
@@ -293,12 +327,6 @@ class _CameraScreenState extends State<CameraScreen> {
         image.width.toDouble(),
         image.height.toDouble(),
       );
-
-      if (_frameCount % 30 == 0) {
-        debugPrint(
-          '📊 Frame $_frameCount - Image size: ${image.width}x${image.height}',
-        );
-      }
 
       final inputImage = InputImage.fromBytes(
         bytes: bytes,
@@ -320,11 +348,8 @@ class _CameraScreenState extends State<CameraScreen> {
         }
 
         if (mounted) {
-          setState(() {
-            _currentPose = poses.first;
-            _formFeedback = 'Pose detected!';
-          });
-          _checkPullUp(poses.first);
+          _currentPose = poses.first;
+          _processPose(poses.first);
         }
       } else {
         if (_frameCount % 30 == 0) {
@@ -378,7 +403,8 @@ class _CameraScreenState extends State<CameraScreen> {
           .doc(user.uid)
           .collection('workouts')
           .add({
-            'pullUpCount': _pullUpCount,
+            'exerciseType': widget.exerciseType,
+            'repCount': _repCount,
             'timestamp': Timestamp.now(),
             'durationMs': durationMs,
           });
@@ -396,6 +422,147 @@ class _CameraScreenState extends State<CameraScreen> {
         ).showSnackBar(SnackBar(content: Text('Failed to save: $e')));
       }
     }
+  }
+
+  /// Routes pose processing to the correct detection method based on exercise type
+  void _processPose(Pose pose) {
+    debugPrint('🏋️ Processing pose for exercise: ${widget.exerciseType}');
+    switch (widget.exerciseType.toLowerCase()) {
+      case 'push-up':
+      case 'pushup':
+      case 'push up':
+        debugPrint('✅ Using PUSH-UP detection');
+        _checkPushUp(pose);
+        break;
+      case 'sit-up':
+      case 'situp':
+      case 'sit up':
+        debugPrint('✅ Using SIT-UP detection');
+        _checkSitUp(pose);
+        break;
+      case 'pull-up':
+      case 'pullup':
+      case 'pull up':
+      default:
+        debugPrint('✅ Using PULL-UP detection');
+        _checkPullUp(pose);
+        break;
+    }
+  }
+
+  /// Push-up detection based on Python PushUpCounter.py algorithm
+  /// Uses elbow angle, shoulder angle, and hip angle
+  void _checkPushUp(Pose pose) {
+    final PoseLandmark? leftShoulder =
+        pose.landmarks[PoseLandmarkType.leftShoulder];
+    final PoseLandmark? leftElbow = pose.landmarks[PoseLandmarkType.leftElbow];
+    final PoseLandmark? leftWrist = pose.landmarks[PoseLandmarkType.leftWrist];
+    final PoseLandmark? leftHip = pose.landmarks[PoseLandmarkType.leftHip];
+    final PoseLandmark? leftKnee = pose.landmarks[PoseLandmarkType.leftKnee];
+
+    if (leftShoulder == null ||
+        leftElbow == null ||
+        leftWrist == null ||
+        leftHip == null ||
+        leftKnee == null) {
+      setState(() {
+        _formFeedback = 'Position your full body in frame';
+      });
+      return;
+    }
+
+    // Calculate angles (matching Python: 11, 13, 15 for elbow)
+    double elbowAngle = _calculateAngle(leftShoulder, leftElbow, leftWrist);
+    // Shoulder angle: elbow → shoulder → hip (13, 11, 23)
+    double shoulderAngle = _calculateAngle(leftElbow, leftShoulder, leftHip);
+    // Hip angle: shoulder → hip → knee (11, 23, 25)
+    double hipAngle = _calculateAngle(leftShoulder, leftHip, leftKnee);
+
+    // Calculate quality based on form
+    double quality = (hipAngle > 140) ? 0.8 : (hipAngle / 180.0);
+
+    setState(() {
+      _repQuality = quality.clamp(0.0, 1.0);
+
+      // Check for proper starting form: elbow > 160, shoulder > 40, hip > 160
+      if (elbowAngle > 160 && shoulderAngle > 40 && hipAngle > 160) {
+        _pushUpForm = 1;
+      }
+
+      if (_pushUpForm == 1) {
+        // DOWN position: elbow <= 90 AND hip > 160 (body straight)
+        if (elbowAngle <= 90 && hipAngle > 160) {
+          _formFeedback = 'Push Up!';
+          _isProperForm = true;
+          if (_pushUpDirection == 0) {
+            _repCount++;
+            _pushUpDirection = 1;
+            debugPrint('💪 Push-up DOWN counted! Total: $_repCount');
+          }
+        }
+        // UP position: elbow > 160, shoulder > 40, hip > 160
+        else if (elbowAngle > 160 && shoulderAngle > 40 && hipAngle > 160) {
+          _formFeedback = 'Go Down!';
+          _isProperForm = true;
+          if (_pushUpDirection == 1) {
+            _pushUpDirection = 0;
+          }
+        } else {
+          _formFeedback = 'Fix Form - Keep body straight';
+          _isProperForm = false;
+        }
+      } else {
+        _formFeedback = 'Get in plank position with arms straight';
+        _isProperForm = false;
+      }
+    });
+  }
+
+  /// Sit-up detection based on Python situp_realtime.py algorithm
+  /// Uses shoulder-hip-knee angle (landmarks 11, 23, 25)
+  void _checkSitUp(Pose pose) {
+    final PoseLandmark? leftShoulder =
+        pose.landmarks[PoseLandmarkType.leftShoulder];
+    final PoseLandmark? leftHip = pose.landmarks[PoseLandmarkType.leftHip];
+    final PoseLandmark? leftKnee = pose.landmarks[PoseLandmarkType.leftKnee];
+
+    if (leftShoulder == null || leftHip == null || leftKnee == null) {
+      setState(() {
+        _formFeedback = 'Position your body in frame (side view)';
+      });
+      return;
+    }
+
+    // Calculate angle: shoulder → hip → knee (11, 23, 25)
+    double angle = _calculateAngle(leftShoulder, leftHip, leftKnee);
+
+    // Calculate quality based on angle
+    double quality = angle < 100 ? 1.0 : (180 - angle) / 80.0;
+
+    setState(() {
+      _repQuality = quality.clamp(0.0, 1.0);
+
+      // DOWN state: angle >= 117 (lying flat)
+      if (angle >= 117) {
+        _sitUpStage = 'down';
+        _formFeedback = 'Sit Up!';
+        _isProperForm = true;
+      }
+
+      // UP state: angle <= 89 AND was in down position
+      if (angle <= 89 && _sitUpStage == 'down') {
+        _sitUpStage = 'up';
+        _repCount++;
+        _formFeedback = 'Great! Go back down';
+        _isProperForm = true;
+        debugPrint('💪 Sit-up counted! Total: $_repCount');
+      } else if (angle > 89 && angle < 117) {
+        _formFeedback = _sitUpStage == 'down'
+            ? 'Keep going up!'
+            : 'Go back down';
+        _isProperForm = false;
+      }
+    });
   }
 
   void _checkPullUp(Pose pose) {
@@ -455,9 +622,9 @@ class _CameraScreenState extends State<CameraScreen> {
           if (_lastRepTime == null ||
               now.difference(_lastRepTime!) >= _minRepDuration) {
             _isInUpPosition = true;
-            _pullUpCount++;
+            _repCount++;
             _lastRepTime = now;
-            debugPrint('💪 Pull-up counted! Total: $_pullUpCount');
+            debugPrint('💪 Pull-up counted! Total: $_repCount');
           }
         } else if (!isProperForm && _isInUpPosition) {
           _isInUpPosition = false;
@@ -649,7 +816,7 @@ class _CameraScreenState extends State<CameraScreen> {
                           ),
                           const SizedBox(width: 12),
                           Text(
-                            '$_pullUpCount',
+                            '$_repCount',
                             style: const TextStyle(
                               color: Colors.white,
                               fontSize: 40,
@@ -659,7 +826,7 @@ class _CameraScreenState extends State<CameraScreen> {
                           ),
                           const SizedBox(width: 8),
                           Text(
-                            'Pull-ups',
+                            widget.exerciseType,
                             style: TextStyle(
                               color: Colors.white.withOpacity(0.6),
                               fontSize: 16,
