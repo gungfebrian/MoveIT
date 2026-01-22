@@ -309,7 +309,6 @@ class HistoryTab extends StatelessWidget {
     );
   }
 
-  // ML-tracked session card (Pull-Ups, Push-Ups via camera)
   Widget _buildMLSessionCard({
     required Map<String, dynamic> data,
     bool isLatest = false,
