@@ -9,11 +9,13 @@ import 'dart:math' as math;
 
 class CameraScreen extends StatefulWidget {
   final CameraDescription camera;
+  final List<CameraDescription> cameras;
   final String exerciseType;
 
   const CameraScreen({
     super.key,
     required this.camera,
+    required this.cameras,
     this.exerciseType = 'Pull-Up',
   });
 
@@ -196,6 +198,7 @@ class _CameraScreenState extends State<CameraScreen> {
   late CameraController _controller;
   late Future<void> _initializeControllerFuture;
   late PoseDetector _poseDetector;
+  late CameraDescription _currentCamera;
   bool _isProcessing = false;
   int _repCount = 0;
   bool _isInUpPosition = false;
@@ -229,6 +232,7 @@ class _CameraScreenState extends State<CameraScreen> {
 
     debugPrint('🎬 Initializing Camera Screen');
     _sessionStart = DateTime.now();
+    _currentCamera = widget.camera;
 
     _initializeControllerFuture = _initCameraAndPose();
   }
@@ -236,23 +240,26 @@ class _CameraScreenState extends State<CameraScreen> {
   @override
   void dispose() {
     debugPrint('🛑 Disposing Pull-Up camera');
-    _disposeResourcesAsync();
-    super.dispose();
-  }
 
-  Future<void> _disposeResourcesAsync() async {
+    // 1. Stop processing immediately to prevent "setState after dispose"
+    _isProcessing = true;
+
+    // 2. Dispose pose detector first to stop ML calculations
     try {
-      _disposeCamera();
-      await _controller.dispose();
-    } catch (e) {
-      debugPrint('⚠️ Camera dispose error: $e');
-    }
-    try {
-      await _poseDetector.close();
+      _poseDetector.close();
     } catch (e) {
       debugPrint('⚠️ PoseDetector dispose error: $e');
     }
+
+    // 3. Dispose camera controller (internally stops the stream)
+    try {
+      _controller.dispose();
+    } catch (e) {
+      debugPrint('⚠️ Camera dispose error: $e');
+    }
+
     debugPrint('✅ Pull-Up resources released');
+    super.dispose();
   }
 
   Future<void> _initCameraAndPose() async {
@@ -270,8 +277,8 @@ class _CameraScreenState extends State<CameraScreen> {
     );
 
     _controller = CameraController(
-      widget.camera,
-      ResolutionPreset.medium,
+      _currentCamera,
+      ResolutionPreset.low, // Use low resolution to reduce memory pressure
       enableAudio: false,
       imageFormatGroup: ImageFormatGroup.yuv420,
     );
@@ -287,8 +294,48 @@ class _CameraScreenState extends State<CameraScreen> {
     }
   }
 
+  Future<void> _switchCamera() async {
+    if (widget.cameras.length < 2) return;
+
+    _isProcessing = true;
+
+    try {
+      _controller.dispose();
+    } catch (e) {
+      debugPrint('⚠️ Camera dispose error: $e');
+    }
+
+    final newCamera = widget.cameras.firstWhere(
+      (cam) => cam.lensDirection != _currentCamera.lensDirection,
+      orElse: () => widget.cameras.first,
+    );
+
+    setState(() {
+      _currentCamera = newCamera;
+      _currentPose = null;
+    });
+
+    _controller = CameraController(
+      _currentCamera,
+      ResolutionPreset.low,
+      enableAudio: false,
+      imageFormatGroup: ImageFormatGroup.yuv420,
+    );
+
+    try {
+      await _controller.initialize();
+      if (mounted) {
+        _initializeCamera();
+      }
+    } catch (e) {
+      debugPrint('❌ Camera switch error: $e');
+    }
+
+    _isProcessing = false;
+  }
+
   InputImageRotation _getImageRotation() {
-    final sensorOrientation = widget.camera.sensorOrientation;
+    final sensorOrientation = _currentCamera.sensorOrientation;
     debugPrint('📐 Sensor orientation: $sensorOrientation');
 
     // Map common Android sensor orientations to ML Kit rotation
@@ -306,12 +353,13 @@ class _CameraScreenState extends State<CameraScreen> {
   }
 
   Future<void> _processImage(CameraImage image) async {
-    if (_isProcessing) return;
+    // Safety check: stop if already processing or widget is disposed
+    if (_isProcessing || !mounted) return;
     _isProcessing = true;
     _frameCount++;
 
-    // Skip frames for better performance (process every 3rd frame)
-    if (_frameCount % 3 != 0) {
+    // Skip frames for better performance (process every 5th frame to reduce CPU/RAM pressure)
+    if (_frameCount % 5 != 0) {
       _isProcessing = false;
       return;
     }
@@ -378,12 +426,6 @@ class _CameraScreenState extends State<CameraScreen> {
     _controller.startImageStream((CameraImage image) {
       _processImage(image);
     });
-  }
-
-  void _disposeCamera() {
-    if (_controller.value.isStreamingImages) {
-      _controller.stopImageStream();
-    }
   }
 
   Future<void> _saveSessionToHistory() async {
@@ -737,298 +779,335 @@ class _CameraScreenState extends State<CameraScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.black,
-      body: Stack(
-        children: <Widget>[
-          FutureBuilder<void>(
-            future: _initializeControllerFuture,
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.done) {
-                return SizedBox(
-                  width: MediaQuery.of(context).size.width,
-                  height: MediaQuery.of(context).size.height,
-                  child: Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      CameraPreview(_controller),
-                      if (_currentPose != null)
-                        CustomPaint(
-                          size: Size(
-                            MediaQuery.of(context).size.width,
-                            MediaQuery.of(context).size.height,
-                          ),
-                          painter: PosePainter(
-                            pose: _currentPose!,
-                            imageSize: Size(
-                              _controller.value.previewSize!.height,
-                              _controller.value.previewSize!.width,
-                            ),
-                            screenSize: Size(
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) return;
+        // Auto-save session when user swipes back
+        await _saveSessionToHistory();
+        if (mounted) Navigator.pop(context);
+      },
+      child: Scaffold(
+        backgroundColor: Colors.black,
+        body: Stack(
+          children: <Widget>[
+            FutureBuilder<void>(
+              future: _initializeControllerFuture,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.done) {
+                  return SizedBox(
+                    width: MediaQuery.of(context).size.width,
+                    height: MediaQuery.of(context).size.height,
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        CameraPreview(_controller),
+                        if (_currentPose != null)
+                          CustomPaint(
+                            size: Size(
                               MediaQuery.of(context).size.width,
                               MediaQuery.of(context).size.height,
                             ),
-                            cameraLensDirection: widget.camera.lensDirection,
-                          ),
-                        ),
-                      if (_currentPose != null) const SizedBox.shrink(),
-                    ],
-                  ),
-                );
-              } else {
-                return const Center(
-                  child: CircularProgressIndicator(color: Color(0xFF2196F3)),
-                );
-              }
-            },
-          ),
-          // Top HUD with modern design
-          Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-            child: SafeArea(
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  children: [
-                    // Pull-up counter
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 24,
-                        vertical: 16,
-                      ),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF1A1F2E).withOpacity(0.95),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(
-                          color: const Color(0xFF2196F3).withOpacity(0.3),
-                          width: 1,
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const Icon(
-                            Icons.fitness_center_rounded,
-                            color: Color(0xFF2196F3),
-                            size: 28,
-                          ),
-                          const SizedBox(width: 12),
-                          Text(
-                            '$_repCount',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 40,
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: -1,
+                            painter: PosePainter(
+                              pose: _currentPose!,
+                              imageSize: Size(
+                                _controller.value.previewSize!.height,
+                                _controller.value.previewSize!.width,
+                              ),
+                              screenSize: Size(
+                                MediaQuery.of(context).size.width,
+                                MediaQuery.of(context).size.height,
+                              ),
+                              cameraLensDirection: _currentCamera.lensDirection,
                             ),
                           ),
-                          const SizedBox(width: 8),
-                          Text(
-                            widget.exerciseType,
-                            style: TextStyle(
-                              color: Colors.white.withOpacity(0.6),
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
-                      ),
+                        if (_currentPose != null) const SizedBox.shrink(),
+                      ],
                     ),
-                    const SizedBox(height: 12),
-                    // Form feedback
-                    if (_formFeedback.isNotEmpty)
+                  );
+                } else {
+                  return const Center(
+                    child: CircularProgressIndicator(color: Color(0xFF2196F3)),
+                  );
+                }
+              },
+            ),
+            // Top HUD with modern design
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              child: SafeArea(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    children: [
+                      // Pull-up counter
                       Container(
                         padding: const EdgeInsets.symmetric(
-                          horizontal: 20,
-                          vertical: 12,
+                          horizontal: 24,
+                          vertical: 16,
                         ),
                         decoration: BoxDecoration(
-                          color: _isProperForm
-                              ? const Color(0xFF4CAF50).withOpacity(0.9)
-                              : const Color(0xFFFF9800).withOpacity(0.9),
-                          borderRadius: BorderRadius.circular(16),
+                          color: const Color(0xFF1A1F2E).withOpacity(0.95),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: const Color(0xFF2196F3).withOpacity(0.3),
+                            width: 1,
+                          ),
                         ),
                         child: Row(
-                          mainAxisSize: MainAxisSize.min,
+                          mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(
-                              _isProperForm
-                                  ? Icons.check_circle_rounded
-                                  : Icons.info_rounded,
-                              color: Colors.white,
-                              size: 20,
+                            const Icon(
+                              Icons.fitness_center_rounded,
+                              color: Color(0xFF2196F3),
+                              size: 28,
+                            ),
+                            const SizedBox(width: 12),
+                            Text(
+                              '$_repCount',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 40,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: -1,
+                              ),
                             ),
                             const SizedBox(width: 8),
-                            Flexible(
-                              child: Text(
-                                _formFeedback,
-                                textAlign: TextAlign.center,
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w600,
+                            Text(
+                              widget.exerciseType,
+                              style: TextStyle(
+                                color: Colors.white.withOpacity(0.6),
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      // Form feedback
+                      if (_formFeedback.isNotEmpty)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 20,
+                            vertical: 12,
+                          ),
+                          decoration: BoxDecoration(
+                            color: _isProperForm
+                                ? const Color(0xFF4CAF50).withOpacity(0.9)
+                                : const Color(0xFFFF9800).withOpacity(0.9),
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                _isProperForm
+                                    ? Icons.check_circle_rounded
+                                    : Icons.info_rounded,
+                                color: Colors.white,
+                                size: 20,
+                              ),
+                              const SizedBox(width: 8),
+                              Flexible(
+                                child: Text(
+                                  _formFeedback,
+                                  textAlign: TextAlign.center,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      const SizedBox(height: 12),
+                      // Quality bar
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF1A1F2E).withOpacity(0.9),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Column(
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  'Form Quality',
+                                  style: TextStyle(
+                                    color: Colors.white.withOpacity(0.7),
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                Text(
+                                  '${(_repQuality * 100).toInt()}%',
+                                  style: TextStyle(
+                                    color: _getQualityColor(_repQuality),
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(4),
+                              child: SizedBox(
+                                height: 6,
+                                child: LinearProgressIndicator(
+                                  value: _repQuality,
+                                  backgroundColor: Colors.white.withOpacity(
+                                    0.1,
+                                  ),
+                                  valueColor: AlwaysStoppedAnimation(
+                                    _getQualityColor(_repQuality),
+                                  ),
                                 ),
                               ),
                             ),
                           ],
                         ),
                       ),
-                    const SizedBox(height: 12),
-                    // Quality bar
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF1A1F2E).withOpacity(0.9),
-                        borderRadius: BorderRadius.circular(12),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            // Rotate Camera Button
+            if (widget.cameras.length > 1)
+              Positioned(
+                bottom: 100,
+                right: 20,
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1A1F2E).withOpacity(0.9),
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: const Color(0xFF2196F3).withOpacity(0.3),
+                    ),
+                  ),
+                  child: IconButton(
+                    onPressed: _switchCamera,
+                    icon: const Icon(
+                      Icons.cameraswitch_rounded,
+                      color: Colors.white,
+                      size: 28,
+                    ),
+                    tooltip: 'Switch Camera',
+                  ),
+                ),
+              ),
+            // Bottom END button with modern design
+            Positioned(
+              bottom: 20,
+              left: 0,
+              right: 0,
+              child: Center(
+                child: Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.red.withOpacity(0.3),
+                        blurRadius: 20,
+                        spreadRadius: 2,
                       ),
-                      child: Column(
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(
-                                'Form Quality',
-                                style: TextStyle(
-                                  color: Colors.white.withOpacity(0.7),
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
-                                ),
+                    ],
+                  ),
+                  child: ElevatedButton.icon(
+                    onPressed: () async {
+                      final confirm =
+                          await showDialog<bool>(
+                            context: context,
+                            builder: (ctx) => AlertDialog(
+                              backgroundColor: const Color(0xFF1A1F2E),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(20),
                               ),
-                              Text(
-                                '${(_repQuality * 100).toInt()}%',
+                              title: const Text(
+                                'End Session?',
                                 style: TextStyle(
-                                  color: _getQualityColor(_repQuality),
-                                  fontSize: 12,
+                                  color: Colors.white,
                                   fontWeight: FontWeight.w700,
                                 ),
                               ),
-                            ],
-                          ),
-                          const SizedBox(height: 8),
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(4),
-                            child: SizedBox(
-                              height: 6,
-                              child: LinearProgressIndicator(
-                                value: _repQuality,
-                                backgroundColor: Colors.white.withOpacity(0.1),
-                                valueColor: AlwaysStoppedAnimation(
-                                  _getQualityColor(_repQuality),
-                                ),
+                              content: const Text(
+                                'Your pull-up count will be saved to history.',
+                                style: TextStyle(color: Colors.white70),
                               ),
+                              actions: [
+                                TextButton(
+                                  onPressed: () => Navigator.of(ctx).pop(false),
+                                  child: Text(
+                                    'Cancel',
+                                    style: TextStyle(
+                                      color: Colors.white.withOpacity(0.6),
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
+                                ElevatedButton(
+                                  onPressed: () => Navigator.of(ctx).pop(true),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.red,
+                                    foregroundColor: Colors.white,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                  ),
+                                  child: const Text(
+                                    'End Session',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
-                          ),
-                        ],
+                          ) ??
+                          false;
+
+                      if (!confirm) return;
+
+                      await _saveSessionToHistory();
+                      if (mounted) {
+                        Navigator.of(context).pop();
+                      }
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFD32F2F),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 40,
+                        vertical: 16,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      elevation: 0,
+                    ),
+                    icon: const Icon(Icons.stop_rounded, size: 24),
+                    label: const Text(
+                      'End Session',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.5,
                       ),
                     ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          // Bottom END button with modern design
-          Positioned(
-            bottom: 20,
-            left: 0,
-            right: 0,
-            child: Center(
-              child: Container(
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(16),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.red.withOpacity(0.3),
-                      blurRadius: 20,
-                      spreadRadius: 2,
-                    ),
-                  ],
-                ),
-                child: ElevatedButton.icon(
-                  onPressed: () async {
-                    final confirm =
-                        await showDialog<bool>(
-                          context: context,
-                          builder: (ctx) => AlertDialog(
-                            backgroundColor: const Color(0xFF1A1F2E),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            title: const Text(
-                              'End Session?',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                            content: const Text(
-                              'Your pull-up count will be saved to history.',
-                              style: TextStyle(color: Colors.white70),
-                            ),
-                            actions: [
-                              TextButton(
-                                onPressed: () => Navigator.of(ctx).pop(false),
-                                child: Text(
-                                  'Cancel',
-                                  style: TextStyle(
-                                    color: Colors.white.withOpacity(0.6),
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ),
-                              ElevatedButton(
-                                onPressed: () => Navigator.of(ctx).pop(true),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.red,
-                                  foregroundColor: Colors.white,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                ),
-                                child: const Text(
-                                  'End Session',
-                                  style: TextStyle(fontWeight: FontWeight.w700),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ) ??
-                        false;
-
-                    if (!confirm) return;
-
-                    await _saveSessionToHistory();
-                    if (mounted) {
-                      Navigator.of(context).pop();
-                    }
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFD32F2F),
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 40,
-                      vertical: 16,
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    elevation: 0,
-                  ),
-                  icon: const Icon(Icons.stop_rounded, size: 24),
-                  label: const Text(
-                    'End Session',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 0.5,
-                    ),
                   ),
                 ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

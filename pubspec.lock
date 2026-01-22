@@ -45,18 +45,18 @@ packages:
     dependency: "direct main"
     description:
       name: camera
-      sha256: ebebead3d5ec3d148249331d751d462d7e8c98102b8830a9b45ec96a2bd4333f
+      sha256: eefad89f262a873f38d21e5eec853461737ea074d7c9ede39f3ceb135d201cab
       url: "https://pub.dev"
     source: hosted
-    version: "0.10.5+2"
-  camera_android:
+    version: "0.11.3"
+  camera_android_camerax:
     dependency: transitive
     description:
-      name: camera_android
-      sha256: "8397c4fcec4f4dbafdeff994adc6ed16dcaa4a25f02e70e3b8fbe59c9a88807f"
+      name: camera_android_camerax
+      sha256: bc7a96998258adddd0b653dd693b0874537707d58b0489708f2a646e4f124246
       url: "https://pub.dev"
     source: hosted
-    version: "0.10.10+11"
+    version: "0.6.27"
   camera_avfoundation:
     dependency: transitive
     description:
@@ -316,18 +316,18 @@ packages:
     dependency: transitive
     description:
       name: google_mlkit_commons
-      sha256: "27d626c66a181351a953eba5b6ff1ff123aadb891b4dab085b292118f039d6ac"
+      sha256: "9990a65f407a3ef6bae646bf10143faa93fec126683771465bc6c0b43fb0e6e9"
       url: "https://pub.dev"
     source: hosted
-    version: "0.7.1"
+    version: "0.8.1"
   google_mlkit_pose_detection:
     dependency: "direct main"
     description:
       name: google_mlkit_pose_detection
-      sha256: "6114c9a3327f9d6556949211803d86199d6cc40f16032e3f09a523e74fea0227"
+      sha256: "24d92165cbb57c44d5c1e83f07cee3299cb62603c5d28f61a96c808a76a46763"
       url: "https://pub.dev"
     source: hosted
-    version: "0.11.1"
+    version: "0.12.1"
   google_sign_in:
     dependency: "direct main"
     description:
@@ -680,14 +680,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "6.1.5+1"
-  quiver:
-    dependency: transitive
-    description:
-      name: quiver
-      sha256: ea0b925899e64ecdfbf9c7becb60d5b50e706ade44a85b2363be2a22d88117d2
-      url: "https://pub.dev"
-    source: hosted
-    version: "3.2.2"
   shared_preferences:
     dependency: "direct main"
     description:

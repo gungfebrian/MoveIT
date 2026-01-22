@@ -131,8 +131,13 @@ class SitUpPosePainter extends CustomPainter {
 /// Uses algorithm from lib/Detection/Situp/a.py and situp_realtime.py
 class SitUpCameraScreen extends StatefulWidget {
   final CameraDescription camera;
+  final List<CameraDescription> cameras;
 
-  const SitUpCameraScreen({super.key, required this.camera});
+  const SitUpCameraScreen({
+    super.key,
+    required this.camera,
+    required this.cameras,
+  });
 
   @override
   State<SitUpCameraScreen> createState() => _SitUpCameraScreenState();
@@ -142,6 +147,7 @@ class _SitUpCameraScreenState extends State<SitUpCameraScreen> {
   late CameraController _controller;
   late Future<void> _initializeControllerFuture;
   late PoseDetector _poseDetector;
+  late CameraDescription _currentCamera;
   bool _isProcessing = false;
   int _repCount = 0;
   Pose? _currentPose;
@@ -161,31 +167,33 @@ class _SitUpCameraScreenState extends State<SitUpCameraScreen> {
     super.initState();
     debugPrint('🏋️ Initializing Sit-Up Camera Screen');
     _sessionStart = DateTime.now();
+    _currentCamera = widget.camera;
     _initializeControllerFuture = _initCameraAndPose();
   }
 
   @override
   void dispose() {
     debugPrint('🛑 Disposing Sit-Up camera');
-    _disposeResources();
-    super.dispose();
-  }
 
-  Future<void> _disposeResources() async {
+    // 1. Stop processing immediately to prevent "setState after dispose"
+    _isProcessing = true;
+
+    // 2. Dispose pose detector first to stop ML calculations
     try {
-      if (_controller.value.isStreamingImages) {
-        await _controller.stopImageStream();
-      }
-      await _controller.dispose();
-    } catch (e) {
-      debugPrint('⚠️ Camera dispose error: $e');
-    }
-    try {
-      await _poseDetector.close();
+      _poseDetector.close();
     } catch (e) {
       debugPrint('⚠️ PoseDetector dispose error: $e');
     }
+
+    // 3. Dispose camera controller (internally stops the stream)
+    try {
+      _controller.dispose();
+    } catch (e) {
+      debugPrint('⚠️ Camera dispose error: $e');
+    }
+
     debugPrint('✅ Sit-Up resources released');
+    super.dispose();
   }
 
   Future<void> _initCameraAndPose() async {
@@ -202,8 +210,8 @@ class _SitUpCameraScreenState extends State<SitUpCameraScreen> {
     );
 
     _controller = CameraController(
-      widget.camera,
-      ResolutionPreset.medium,
+      _currentCamera,
+      ResolutionPreset.low, // Use low resolution to reduce memory pressure
       enableAudio: false,
       imageFormatGroup: ImageFormatGroup.yuv420,
     );
@@ -219,8 +227,52 @@ class _SitUpCameraScreenState extends State<SitUpCameraScreen> {
     }
   }
 
+  Future<void> _switchCamera() async {
+    if (widget.cameras.length < 2) return;
+
+    _isProcessing = true;
+
+    // Stop current camera stream first
+    try {
+      if (_controller.value.isStreamingImages) {
+        await _controller.stopImageStream();
+      }
+      await _controller.dispose();
+    } catch (e) {
+      debugPrint('⚠️ Camera dispose error: $e');
+    }
+
+    // Switch to other camera
+    final newCamera = widget.cameras.firstWhere(
+      (cam) => cam.lensDirection != _currentCamera.lensDirection,
+      orElse: () => widget.cameras.first,
+    );
+
+    _currentCamera = newCamera;
+    _currentPose = null;
+
+    // Create new controller and update the future for FutureBuilder
+    _controller = CameraController(
+      _currentCamera,
+      ResolutionPreset.low,
+      enableAudio: false,
+      imageFormatGroup: ImageFormatGroup.yuv420,
+    );
+
+    // Update the future so FutureBuilder rebuilds
+    setState(() {
+      _initializeControllerFuture = _controller.initialize().then((_) {
+        if (mounted) {
+          _controller.startImageStream(_processImage);
+        }
+      });
+    });
+
+    _isProcessing = false;
+  }
+
   InputImageRotation _getImageRotation() {
-    switch (widget.camera.sensorOrientation) {
+    switch (_currentCamera.sensorOrientation) {
       case 90:
         return InputImageRotation.rotation90deg;
       case 180:
@@ -233,12 +285,13 @@ class _SitUpCameraScreenState extends State<SitUpCameraScreen> {
   }
 
   Future<void> _processImage(CameraImage image) async {
-    if (_isProcessing) return;
+    // Safety check: stop if already processing or widget is disposed
+    if (_isProcessing || !mounted) return;
     _isProcessing = true;
     _frameCount++;
 
-    // Skip frames for better performance (process every 3rd frame)
-    if (_frameCount % 3 != 0) {
+    // Skip frames for better performance (process every 5th frame to reduce CPU/RAM pressure)
+    if (_frameCount % 5 != 0) {
       _isProcessing = false;
       return;
     }
@@ -381,195 +434,228 @@ class _SitUpCameraScreenState extends State<SitUpCameraScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.black,
-      body: Stack(
-        children: [
-          FutureBuilder<void>(
-            future: _initializeControllerFuture,
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.done) {
-                return SizedBox(
-                  width: MediaQuery.of(context).size.width,
-                  height: MediaQuery.of(context).size.height,
-                  child: Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      CameraPreview(_controller),
-                      if (_currentPose != null)
-                        CustomPaint(
-                          painter: SitUpPosePainter(
-                            pose: _currentPose!,
-                            imageSize: Size(
-                              _controller.value.previewSize!.height,
-                              _controller.value.previewSize!.width,
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) return;
+        // Auto-save session when user swipes back
+        await _saveSession();
+        if (mounted) Navigator.pop(context);
+      },
+      child: Scaffold(
+        backgroundColor: Colors.black,
+        body: Stack(
+          children: [
+            FutureBuilder<void>(
+              future: _initializeControllerFuture,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.done) {
+                  return SizedBox(
+                    width: MediaQuery.of(context).size.width,
+                    height: MediaQuery.of(context).size.height,
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        CameraPreview(_controller),
+                        if (_currentPose != null)
+                          CustomPaint(
+                            painter: SitUpPosePainter(
+                              pose: _currentPose!,
+                              imageSize: Size(
+                                _controller.value.previewSize!.height,
+                                _controller.value.previewSize!.width,
+                              ),
+                              screenSize: MediaQuery.of(context).size,
+                              cameraLensDirection: _currentCamera.lensDirection,
                             ),
-                            screenSize: MediaQuery.of(context).size,
-                            cameraLensDirection: widget.camera.lensDirection,
+                          ),
+                      ],
+                    ),
+                  );
+                }
+                return const Center(
+                  child: CircularProgressIndicator(color: Color(0xFF9C27B0)),
+                );
+              },
+            ),
+            // HUD
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              child: SafeArea(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    children: [
+                      // Counter
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 24,
+                          vertical: 16,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF1A1F2E).withOpacity(0.95),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: const Color(0xFF9C27B0).withOpacity(0.3),
                           ),
                         ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(
+                              Icons.self_improvement,
+                              color: Color(0xFF9C27B0),
+                              size: 28,
+                            ),
+                            const SizedBox(width: 12),
+                            Text(
+                              '$_repCount',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 40,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Sit-Ups',
+                              style: TextStyle(
+                                color: Colors.white.withOpacity(0.6),
+                                fontSize: 16,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      // Feedback
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 20,
+                          vertical: 12,
+                        ),
+                        decoration: BoxDecoration(
+                          color: _isProperForm
+                              ? const Color(0xFF4CAF50).withOpacity(0.9)
+                              : const Color(0xFFFF9800).withOpacity(0.9),
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: Text(
+                          _formFeedback,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      // Quality bar
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF1A1F2E).withOpacity(0.9),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Column(
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  'Form Quality',
+                                  style: TextStyle(
+                                    color: Colors.white.withOpacity(0.7),
+                                    fontSize: 12,
+                                  ),
+                                ),
+                                Text(
+                                  '${(_repQuality * 100).toInt()}%',
+                                  style: TextStyle(
+                                    color: _getQualityColor(_repQuality),
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(4),
+                              child: LinearProgressIndicator(
+                                value: _repQuality,
+                                backgroundColor: Colors.white.withOpacity(0.1),
+                                valueColor: AlwaysStoppedAnimation(
+                                  _getQualityColor(_repQuality),
+                                ),
+                                minHeight: 6,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     ],
                   ),
-                );
-              }
-              return const Center(
-                child: CircularProgressIndicator(color: Color(0xFF9C27B0)),
-              );
-            },
-          ),
-          // HUD
-          Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-            child: SafeArea(
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  children: [
-                    // Counter
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 24,
-                        vertical: 16,
-                      ),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF1A1F2E).withOpacity(0.95),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(
-                          color: const Color(0xFF9C27B0).withOpacity(0.3),
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const Icon(
-                            Icons.self_improvement,
-                            color: Color(0xFF9C27B0),
-                            size: 28,
-                          ),
-                          const SizedBox(width: 12),
-                          Text(
-                            '$_repCount',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 40,
-                              fontWeight: FontWeight.w900,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            'Sit-Ups',
-                            style: TextStyle(
-                              color: Colors.white.withOpacity(0.6),
-                              fontSize: 16,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    // Feedback
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 20,
-                        vertical: 12,
-                      ),
-                      decoration: BoxDecoration(
-                        color: _isProperForm
-                            ? const Color(0xFF4CAF50).withOpacity(0.9)
-                            : const Color(0xFFFF9800).withOpacity(0.9),
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: Text(
-                        _formFeedback,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    // Quality bar
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF1A1F2E).withOpacity(0.9),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Column(
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(
-                                'Form Quality',
-                                style: TextStyle(
-                                  color: Colors.white.withOpacity(0.7),
-                                  fontSize: 12,
-                                ),
-                              ),
-                              Text(
-                                '${(_repQuality * 100).toInt()}%',
-                                style: TextStyle(
-                                  color: _getQualityColor(_repQuality),
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 8),
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(4),
-                            child: LinearProgressIndicator(
-                              value: _repQuality,
-                              backgroundColor: Colors.white.withOpacity(0.1),
-                              valueColor: AlwaysStoppedAnimation(
-                                _getQualityColor(_repQuality),
-                              ),
-                              minHeight: 6,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
                 ),
               ),
             ),
-          ),
-          // End button
-          Positioned(
-            bottom: 20,
-            left: 0,
-            right: 0,
-            child: Center(
-              child: ElevatedButton.icon(
-                onPressed: () async {
-                  await _saveSession();
-                  if (mounted) Navigator.pop(context);
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFD32F2F),
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 40,
-                    vertical: 16,
+            // Rotate Camera Button
+            if (widget.cameras.length > 1)
+              Positioned(
+                bottom: 100,
+                right: 20,
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1A1F2E).withOpacity(0.9),
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: const Color(0xFF9C27B0).withOpacity(0.3),
+                    ),
                   ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
+                  child: IconButton(
+                    onPressed: _switchCamera,
+                    icon: const Icon(
+                      Icons.cameraswitch_rounded,
+                      color: Colors.white,
+                      size: 28,
+                    ),
+                    tooltip: 'Switch Camera',
                   ),
                 ),
-                icon: const Icon(Icons.stop_rounded),
-                label: const Text(
-                  'End Session',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+              ),
+            // End button
+            Positioned(
+              bottom: 20,
+              left: 0,
+              right: 0,
+              child: Center(
+                child: ElevatedButton.icon(
+                  onPressed: () async {
+                    await _saveSession();
+                    if (mounted) Navigator.pop(context);
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFD32F2F),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 40,
+                      vertical: 16,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                  ),
+                  icon: const Icon(Icons.stop_rounded),
+                  label: const Text(
+                    'End Session',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+                  ),
                 ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

@@ -6,8 +6,13 @@ import 'situp_camera_screen.dart';
 
 class WorkoutSetupScreen extends StatefulWidget {
   final CameraDescription camera;
+  final List<CameraDescription> cameras;
 
-  const WorkoutSetupScreen({super.key, required this.camera});
+  const WorkoutSetupScreen({
+    super.key,
+    required this.camera,
+    required this.cameras,
+  });
 
   @override
   State<WorkoutSetupScreen> createState() => _WorkoutSetupScreenState();
@@ -32,14 +37,24 @@ class _WorkoutSetupScreenState extends State<WorkoutSetupScreen> {
     Widget screen;
     switch (_selectedExercise) {
       case 'Push-Up':
-        screen = PushUpCameraScreen(camera: widget.camera);
+        screen = PushUpCameraScreen(
+          camera: widget.camera,
+          cameras: widget.cameras,
+        );
         break;
       case 'Sit-Up':
-        screen = SitUpCameraScreen(camera: widget.camera);
+        screen = SitUpCameraScreen(
+          camera: widget.camera,
+          cameras: widget.cameras,
+        );
         break;
       case 'Pull-Up':
       default:
-        screen = CameraScreen(camera: widget.camera, exerciseType: 'Pull-Up');
+        screen = CameraScreen(
+          camera: widget.camera,
+          cameras: widget.cameras,
+          exerciseType: 'Pull-Up',
+        );
         break;
     }
     Navigator.push(context, MaterialPageRoute(builder: (context) => screen));
