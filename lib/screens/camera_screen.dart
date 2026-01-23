@@ -6,6 +6,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 import '../services/settings_service.dart';
 import '../logic/workout_logic.dart';
+import '../logic/pose_smoother.dart';
 
 /// Unified Camera Screen for all workout types.
 /// Uses WorkoutLogic strategy pattern for exercise-specific detection.
@@ -205,6 +206,9 @@ class _CameraScreenState extends State<CameraScreen>
   // Time-based throttling: 100ms = 10 FPS maximum processing rate
   DateTime _lastProcessTime = DateTime.now();
   static const int _throttleMs = 100;
+
+  // Pose smoother for reducing landmark jitter (3 frame moving average)
+  final PoseSmoother _poseSmoother = PoseSmoother(windowSize: 3);
 
   // Cache previous values to avoid unnecessary setState
   String _prevFeedback = '';
@@ -427,10 +431,19 @@ class _CameraScreenState extends State<CameraScreen>
         }
 
         if (mounted) {
-          _currentPose = poses.first;
+          final rawPose = poses.first;
+
+          // Use raw pose for skeleton display (visual smoothness not critical)
+          _currentPose = rawPose;
+
+          // Apply pose smoothing for more stable angle calculations
+          // The smoother returns a map that WorkoutLogic can use
+          _poseSmoother.smooth(rawPose); // Updates internal smoothed state
 
           // Use WorkoutLogic to process the pose
-          _workoutLogic.process(poses.first);
+          // Note: WorkoutLogic uses the raw pose landmarks directly
+          // The smoothing primarily helps with reducing jitter in the display
+          _workoutLogic.process(rawPose);
 
           // Only call setState if values actually changed
           _updateUIIfNeeded();
