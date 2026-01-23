@@ -143,115 +143,161 @@ class _LoginPageState extends State<LoginPage> {
                   ),
                 ),
 
-                // Content Section
+                // Content Section - With scroll fix for small screens/keyboard
                 Expanded(
                   flex: 5,
-                  child: Padding(
-                    padding: EdgeInsets.symmetric(
-                      horizontal: Responsive.padding(context, 0.07),
-                    ),
-                    child: Column(
-                      children: [
-                        Expanded(
-                          child: PageView.builder(
-                            controller: _pageController,
-                            onPageChanged: (i) =>
-                                setState(() => _currentPage = i),
-                            itemCount: _slides.length,
-                            itemBuilder: (context, index) {
-                              final slide = _slides[index];
-                              return Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      return SingleChildScrollView(
+                        physics: const BouncingScrollPhysics(),
+                        child: ConstrainedBox(
+                          constraints: BoxConstraints(
+                            minHeight: constraints.maxHeight,
+                          ),
+                          child: Padding(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: Responsive.padding(context, 0.07),
+                            ),
+                            child: IntrinsicHeight(
+                              child: Column(
                                 children: [
-                                  Text(
-                                    slide['title'],
-                                    textAlign: TextAlign.center,
-                                    style: TextStyle(
-                                      fontSize: Responsive.text(context, 0.085),
-                                      fontWeight: FontWeight.w900,
-                                      letterSpacing: -1,
-                                      color: _textPrimary,
-                                      height: 1.0,
-                                      fontFamily: 'Inter',
+                                  // Slides section with fixed height
+                                  SizedBox(
+                                    height: Responsive.height(context, 0.22),
+                                    child: PageView.builder(
+                                      controller: _pageController,
+                                      onPageChanged: (i) =>
+                                          setState(() => _currentPage = i),
+                                      itemCount: _slides.length,
+                                      itemBuilder: (context, index) {
+                                        final slide = _slides[index];
+                                        return Column(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.center,
+                                          children: [
+                                            Text(
+                                              slide['title'],
+                                              textAlign: TextAlign.center,
+                                              style: TextStyle(
+                                                fontSize: Responsive.text(
+                                                  context,
+                                                  0.085,
+                                                ),
+                                                fontWeight: FontWeight.w900,
+                                                letterSpacing: -1,
+                                                color: _textPrimary,
+                                                height: 1.0,
+                                                fontFamily: 'Inter',
+                                              ),
+                                            ),
+                                            SizedBox(
+                                              height: Responsive.height(
+                                                context,
+                                                0.02,
+                                              ),
+                                            ),
+                                            Text(
+                                              slide['subtitle'],
+                                              textAlign: TextAlign.center,
+                                              style: TextStyle(
+                                                fontSize: Responsive.text(
+                                                  context,
+                                                  0.04,
+                                                ),
+                                                color: _textSecondary,
+                                                height: 1.5,
+                                              ),
+                                            ),
+                                          ],
+                                        );
+                                      },
+                                    ),
+                                  ),
+
+                                  // Animated Indicator
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: List.generate(_slides.length, (
+                                      index,
+                                    ) {
+                                      bool isSelected = _currentPage == index;
+                                      return AnimatedContainer(
+                                        duration: const Duration(
+                                          milliseconds: 300,
+                                        ),
+                                        margin: const EdgeInsets.symmetric(
+                                          horizontal: 4,
+                                        ),
+                                        height: 6,
+                                        width: isSelected ? 30 : 6,
+                                        decoration: BoxDecoration(
+                                          color: isSelected
+                                              ? _primaryOrange
+                                              : _textSecondary.withOpacity(0.3),
+                                          borderRadius: BorderRadius.circular(
+                                            10,
+                                          ),
+                                        ),
+                                      );
+                                    }),
+                                  ),
+
+                                  // Spacer pushes buttons to bottom
+                                  const Spacer(),
+
+                                  // Action Buttons
+                                  _buildButton(
+                                    context: context,
+                                    text: 'GET STARTED',
+                                    onPressed: () => Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (c) => const RegisterPage(),
+                                      ),
+                                    ),
+                                    isPrimary: true,
+                                  ),
+                                  SizedBox(
+                                    height: Responsive.height(context, 0.015),
+                                  ),
+                                  _buildButton(
+                                    context: context,
+                                    text: 'SIGN IN',
+                                    onPressed: _showLoginModal,
+                                    isPrimary: false,
+                                  ),
+
+                                  // Demo Mode
+                                  TextButton(
+                                    onPressed: () => Navigator.pushReplacement(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (c) => const HomePage(),
+                                      ),
+                                    ),
+                                    child: Text(
+                                      'Enter as Guest',
+                                      style: TextStyle(
+                                        color: _textSecondary,
+                                        fontWeight: FontWeight.w500,
+                                        letterSpacing: 1,
+                                        fontSize: Responsive.text(
+                                          context,
+                                          0.035,
+                                        ),
+                                      ),
                                     ),
                                   ),
                                   SizedBox(
-                                    height: Responsive.height(context, 0.02),
-                                  ),
-                                  Text(
-                                    slide['subtitle'],
-                                    textAlign: TextAlign.center,
-                                    style: TextStyle(
-                                      fontSize: Responsive.text(context, 0.04),
-                                      color: _textSecondary,
-                                      height: 1.5,
-                                    ),
+                                    height: Responsive.height(context, 0.015),
                                   ),
                                 ],
-                              );
-                            },
-                          ),
-                        ),
-
-                        // Animated Indicator
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: List.generate(_slides.length, (index) {
-                            bool isSelected = _currentPage == index;
-                            return AnimatedContainer(
-                              duration: const Duration(milliseconds: 300),
-                              margin: const EdgeInsets.symmetric(horizontal: 4),
-                              height: 6,
-                              width: isSelected ? 30 : 6,
-                              decoration: BoxDecoration(
-                                color: isSelected
-                                    ? _primaryOrange
-                                    : _textSecondary.withOpacity(0.3),
-                                borderRadius: BorderRadius.circular(10),
                               ),
-                            );
-                          }),
-                        ),
-                        const SizedBox(height: 40),
-
-                        // Action Buttons
-                        _buildButton(
-                          context: context,
-                          text: 'GET STARTED',
-                          onPressed: () => Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (c) => const RegisterPage(),
-                            ),
-                          ),
-                          isPrimary: true,
-                        ),
-                        SizedBox(height: Responsive.height(context, 0.015)),
-                        _buildButton(
-                          context: context,
-                          text: 'SIGN IN',
-                          onPressed: _showLoginModal,
-                          isPrimary: false,
-                        ),
-
-                        // Demo Mode
-                        TextButton(
-                          onPressed: () => Navigator.pushReplacement(
-                            context,
-                            MaterialPageRoute(builder: (c) => const HomePage()),
-                          ),
-                          child: const Text(
-                            'Enter as Guest',
-                            style: TextStyle(
-                              color: _textSecondary,
-                              fontWeight: FontWeight.w500,
-                              letterSpacing: 1,
                             ),
                           ),
                         ),
-                        const SizedBox(height: 10),
-                      ],
-                    ),
+                      );
+                    },
                   ),
                 ),
               ],

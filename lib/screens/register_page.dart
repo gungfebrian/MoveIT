@@ -3,6 +3,7 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
+import '../utils/responsive.dart';
 
 class RegisterPage extends StatefulWidget {
   const RegisterPage({super.key});
@@ -100,35 +101,38 @@ class _RegisterPageState extends State<RegisterPage> {
       ),
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 24.0),
+          physics: const BouncingScrollPhysics(),
+          padding: EdgeInsets.symmetric(
+            horizontal: Responsive.padding(context, 0.06),
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const SizedBox(height: 10),
-              const Text(
+              SizedBox(height: Responsive.height(context, 0.015)),
+              Text(
                 'Create Account',
                 style: TextStyle(
                   color: _textPrimary,
-                  fontSize: 32,
+                  fontSize: Responsive.text(context, 0.08),
                   fontWeight: FontWeight.w900,
                   letterSpacing: -1,
                   fontFamily: 'Inter',
                 ),
               ),
-              const SizedBox(height: 8),
-              const Text(
+              SizedBox(height: Responsive.height(context, 0.01)),
+              Text(
                 'Begin your transformation today.',
                 style: TextStyle(
                   color: _textSecondary,
-                  fontSize: 16,
+                  fontSize: Responsive.text(context, 0.04),
                   fontWeight: FontWeight.w400,
                 ),
               ),
-              const SizedBox(height: 40),
+              SizedBox(height: Responsive.height(context, 0.05)),
 
               // Form Container
               Container(
-                padding: const EdgeInsets.all(28.0),
+                padding: EdgeInsets.all(Responsive.padding(context, 0.07)),
                 decoration: BoxDecoration(
                   color: _surfaceColor,
                   borderRadius: BorderRadius.circular(36),
@@ -136,20 +140,23 @@ class _RegisterPageState extends State<RegisterPage> {
                 child: Column(
                   children: [
                     _buildField(
+                      context: context,
                       controller: _nameController,
                       hint: 'Full Name',
                       icon: Icons.person_rounded,
                     ),
-                    const SizedBox(height: 16),
+                    SizedBox(height: Responsive.height(context, 0.02)),
 
                     _buildField(
+                      context: context,
                       controller: _emailController,
                       hint: 'Email Address',
                       icon: Icons.alternate_email_rounded,
                     ),
-                    const SizedBox(height: 16),
+                    SizedBox(height: Responsive.height(context, 0.02)),
 
                     _buildField(
+                      context: context,
                       controller: _passwordController,
                       hint: 'Password',
                       icon: Icons.lock_outline_rounded,
@@ -159,9 +166,10 @@ class _RegisterPageState extends State<RegisterPage> {
                         () => _isPasswordVisible = !_isPasswordVisible,
                       ),
                     ),
-                    const SizedBox(height: 16),
+                    SizedBox(height: Responsive.height(context, 0.02)),
 
                     _buildField(
+                      context: context,
                       controller: _confirmPasswordController,
                       hint: 'Confirm Password',
                       icon: Icons.lock_clock_rounded,
@@ -173,12 +181,12 @@ class _RegisterPageState extends State<RegisterPage> {
                       ),
                     ),
 
-                    const SizedBox(height: 32),
+                    SizedBox(height: Responsive.height(context, 0.04)),
 
                     // Sign Up Button
                     SizedBox(
                       width: double.infinity,
-                      height: 60,
+                      height: Responsive.height(context, 0.07),
                       child: ElevatedButton(
                         onPressed: _isLoading ? null : _register,
                         style: ElevatedButton.styleFrom(
@@ -190,18 +198,18 @@ class _RegisterPageState extends State<RegisterPage> {
                           ),
                         ),
                         child: _isLoading
-                            ? const SizedBox(
-                                width: 24,
-                                height: 24,
-                                child: CircularProgressIndicator(
+                            ? SizedBox(
+                                width: Responsive.icon(context, 0.06),
+                                height: Responsive.icon(context, 0.06),
+                                child: const CircularProgressIndicator(
                                   strokeWidth: 2.5,
                                   color: Colors.white,
                                 ),
                               )
-                            : const Text(
+                            : Text(
                                 'SIGN UP',
                                 style: TextStyle(
-                                  fontSize: 16,
+                                  fontSize: Responsive.text(context, 0.04),
                                   fontWeight: FontWeight.w800,
                                   letterSpacing: 1.2,
                                 ),
@@ -212,21 +220,24 @@ class _RegisterPageState extends State<RegisterPage> {
                 ),
               ),
 
-              const SizedBox(height: 40),
+              SizedBox(height: Responsive.height(context, 0.05)),
 
               // Sign In Link
               Center(
                 child: RichText(
                   text: TextSpan(
                     text: "Already have an account? ",
-                    style: const TextStyle(color: _textSecondary, fontSize: 15),
+                    style: TextStyle(
+                      color: _textSecondary,
+                      fontSize: Responsive.text(context, 0.038),
+                    ),
                     children: [
                       TextSpan(
                         text: 'Sign In',
-                        style: const TextStyle(
+                        style: TextStyle(
                           color: _textPrimary,
                           fontWeight: FontWeight.bold,
-                          fontSize: 15,
+                          fontSize: Responsive.text(context, 0.038),
                         ),
                         recognizer: TapGestureRecognizer()
                           ..onTap = () {
@@ -237,7 +248,7 @@ class _RegisterPageState extends State<RegisterPage> {
                   ),
                 ),
               ),
-              const SizedBox(height: 20),
+              SizedBox(height: Responsive.height(context, 0.025)),
             ],
           ),
         ),
@@ -246,6 +257,7 @@ class _RegisterPageState extends State<RegisterPage> {
   }
 
   Widget _buildField({
+    required BuildContext context,
     required TextEditingController controller,
     required String hint,
     required IconData icon,
@@ -256,11 +268,21 @@ class _RegisterPageState extends State<RegisterPage> {
     return TextField(
       controller: controller,
       obscureText: isPass && !isVisible,
-      style: const TextStyle(color: Colors.white),
+      style: TextStyle(
+        color: Colors.white,
+        fontSize: Responsive.text(context, 0.04),
+      ),
       decoration: InputDecoration(
         hintText: hint,
-        hintStyle: const TextStyle(color: Colors.white30),
-        prefixIcon: Icon(icon, color: const Color(0xFFFF5C00), size: 20),
+        hintStyle: TextStyle(
+          color: Colors.white30,
+          fontSize: Responsive.text(context, 0.04),
+        ),
+        prefixIcon: Icon(
+          icon,
+          color: const Color(0xFFFF5C00),
+          size: Responsive.icon(context, 0.05),
+        ),
         suffixIcon: isPass
             ? IconButton(
                 icon: Icon(
@@ -280,9 +302,9 @@ class _RegisterPageState extends State<RegisterPage> {
           borderRadius: BorderRadius.circular(18),
           borderSide: const BorderSide(color: Color(0xFFFF5C00), width: 1),
         ),
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 20,
-          vertical: 18,
+        contentPadding: EdgeInsets.symmetric(
+          horizontal: Responsive.width(context, 0.05),
+          vertical: Responsive.height(context, 0.02),
         ),
       ),
     );
