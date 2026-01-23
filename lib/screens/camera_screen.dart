@@ -5,8 +5,10 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 import '../services/settings_service.dart';
-import 'dart:math' as math;
+import '../logic/workout_logic.dart';
 
+/// Unified Camera Screen for all workout types.
+/// Uses WorkoutLogic strategy pattern for exercise-specific detection.
 class CameraScreen extends StatefulWidget {
   final CameraDescription camera;
   final List<CameraDescription> cameras;
@@ -23,17 +25,20 @@ class CameraScreen extends StatefulWidget {
   State<CameraScreen> createState() => _CameraScreenState();
 }
 
-class PosePainter extends CustomPainter {
+/// Unified Pose Painter that uses WorkoutLogic theme colors.
+class UnifiedPosePainter extends CustomPainter {
   final Pose pose;
   final Size imageSize;
   final Size screenSize;
   final CameraLensDirection cameraLensDirection;
+  final Color themeColor;
 
-  PosePainter({
+  UnifiedPosePainter({
     required this.pose,
     required this.imageSize,
     required this.screenSize,
     required this.cameraLensDirection,
+    required this.themeColor,
   });
 
   @override
@@ -90,31 +95,28 @@ class PosePainter extends CustomPainter {
       canvas.drawCircle(offset, 4, Paint()..color = Colors.white);
     }
 
-    // Draw all landmarks
     final landmarks = pose.landmarks;
 
-    // Left arm - BLUE (Pull-up theme)
+    // Arms - Theme color
     drawLine(
       landmarks[PoseLandmarkType.leftShoulder],
       landmarks[PoseLandmarkType.leftElbow],
-      const Color(0xFF2196F3),
+      themeColor,
     );
     drawLine(
       landmarks[PoseLandmarkType.leftElbow],
       landmarks[PoseLandmarkType.leftWrist],
-      const Color(0xFF2196F3),
+      themeColor,
     );
-
-    // Right arm - BLUE (Pull-up theme)
     drawLine(
       landmarks[PoseLandmarkType.rightShoulder],
       landmarks[PoseLandmarkType.rightElbow],
-      const Color(0xFF2196F3),
+      themeColor,
     );
     drawLine(
       landmarks[PoseLandmarkType.rightElbow],
       landmarks[PoseLandmarkType.rightWrist],
-      const Color(0xFF2196F3),
+      themeColor,
     );
 
     // Shoulders - YELLOW
@@ -165,27 +167,19 @@ class PosePainter extends CustomPainter {
       Colors.purple,
     );
 
-    // Draw all points with blue theme for Pull-Up
-    drawPoint(
-      landmarks[PoseLandmarkType.leftShoulder],
-      const Color(0xFF2196F3),
-    );
-    drawPoint(landmarks[PoseLandmarkType.leftElbow], const Color(0xFF2196F3));
-    drawPoint(landmarks[PoseLandmarkType.leftWrist], const Color(0xFF2196F3));
+    // Draw arm points with theme color
+    drawPoint(landmarks[PoseLandmarkType.leftShoulder], themeColor);
+    drawPoint(landmarks[PoseLandmarkType.leftElbow], themeColor);
+    drawPoint(landmarks[PoseLandmarkType.leftWrist], themeColor);
+    drawPoint(landmarks[PoseLandmarkType.rightShoulder], themeColor);
+    drawPoint(landmarks[PoseLandmarkType.rightElbow], themeColor);
+    drawPoint(landmarks[PoseLandmarkType.rightWrist], themeColor);
 
-    drawPoint(
-      landmarks[PoseLandmarkType.rightShoulder],
-      const Color(0xFF2196F3),
-    );
-    drawPoint(landmarks[PoseLandmarkType.rightElbow], const Color(0xFF2196F3));
-    drawPoint(landmarks[PoseLandmarkType.rightWrist], const Color(0xFF2196F3));
-
+    // Draw body points
     drawPoint(landmarks[PoseLandmarkType.leftHip], Colors.green);
     drawPoint(landmarks[PoseLandmarkType.rightHip], Colors.green);
-
     drawPoint(landmarks[PoseLandmarkType.leftKnee], Colors.cyan);
     drawPoint(landmarks[PoseLandmarkType.leftAnkle], Colors.cyan);
-
     drawPoint(landmarks[PoseLandmarkType.rightKnee], Colors.purple);
     drawPoint(landmarks[PoseLandmarkType.rightAnkle], Colors.purple);
   }
@@ -194,55 +188,57 @@ class PosePainter extends CustomPainter {
   bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
 }
 
-class _CameraScreenState extends State<CameraScreen> {
+class _CameraScreenState extends State<CameraScreen>
+    with WidgetsBindingObserver {
   late CameraController _controller;
   late Future<void> _initializeControllerFuture;
   late PoseDetector _poseDetector;
   late CameraDescription _currentCamera;
+  late WorkoutLogic _workoutLogic;
+
   bool _isProcessing = false;
-  int _repCount = 0;
-  bool _isInUpPosition = false;
+  bool _isCameraDisposed = false;
   Pose? _currentPose;
-  int _frameCount = 0;
   int _poseDetectedCount = 0;
   late final DateTime _sessionStart;
 
-  // Status gerakan
-  String _formFeedback = 'Detecting pose...';
-  bool _isProperForm = false;
-  double _repQuality = 0.0;
+  // Time-based throttling: 100ms = 10 FPS maximum processing rate
+  DateTime _lastProcessTime = DateTime.now();
+  static const int _throttleMs = 100;
 
-  // Threshold dan konstanta (Pull-up)
-  static const double _minArmAngle = 60.0;
-  static const double _maxShoulderDiff = 0.1;
-  static const double _minConfidence = 0.7;
-  static const Duration _minRepDuration = Duration(milliseconds: 1500);
-  DateTime? _lastRepTime;
-
-  // Push-up state (from Python algorithm)
-  int _pushUpDirection = 0; // 0 = down, 1 = up
-  int _pushUpForm = 0; // 0 = not ready, 1 = form validated
-
-  // Sit-up state (from Python algorithm)
-  String _sitUpStage = 'down'; // 'down' or 'up'
+  // Cache previous values to avoid unnecessary setState
+  String _prevFeedback = '';
+  int _prevRepCount = 0;
+  double _prevQuality = 0.0;
+  bool _prevProperForm = false;
 
   @override
   void initState() {
     super.initState();
+    // Register lifecycle observer for handling app minimize/resume
+    WidgetsBinding.instance.addObserver(this);
 
-    debugPrint('🎬 Initializing Camera Screen');
+    debugPrint('🎬 Initializing Camera Screen for ${widget.exerciseType}');
     _sessionStart = DateTime.now();
     _currentCamera = widget.camera;
+
+    // Create the appropriate workout logic based on exercise type
+    _workoutLogic = WorkoutLogicFactory.create(widget.exerciseType);
+    debugPrint('✅ Using ${_workoutLogic.exerciseName} detection logic');
 
     _initializeControllerFuture = _initCameraAndPose();
   }
 
   @override
   void dispose() {
-    debugPrint('🛑 Disposing Pull-Up camera');
+    debugPrint('🛑 Disposing camera for ${_workoutLogic.exerciseName}');
+
+    // Remove lifecycle observer
+    WidgetsBinding.instance.removeObserver(this);
 
     // 1. Stop processing immediately to prevent "setState after dispose"
     _isProcessing = true;
+    _isCameraDisposed = true;
 
     // 2. Dispose pose detector first to stop ML calculations
     try {
@@ -258,8 +254,45 @@ class _CameraScreenState extends State<CameraScreen> {
       debugPrint('⚠️ Camera dispose error: $e');
     }
 
-    debugPrint('✅ Pull-Up resources released');
+    debugPrint('✅ ${_workoutLogic.exerciseName} resources released');
     super.dispose();
+  }
+
+  /// Handle app lifecycle changes (minimize/resume)
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Don't handle if controller not ready or already disposed
+    if (_isCameraDisposed) return;
+
+    try {
+      if (!_controller.value.isInitialized) return;
+    } catch (e) {
+      return;
+    }
+
+    if (state == AppLifecycleState.inactive) {
+      // App is going to background - stop camera to free memory/battery
+      debugPrint('📱 App inactive - stopping camera stream');
+      _isProcessing = true;
+      try {
+        if (_controller.value.isStreamingImages) {
+          _controller.stopImageStream();
+        }
+      } catch (e) {
+        debugPrint('⚠️ Stop stream error: $e');
+      }
+    } else if (state == AppLifecycleState.resumed) {
+      // App is back to foreground - restart camera
+      debugPrint('📱 App resumed - restarting camera stream');
+      _isProcessing = false;
+      try {
+        if (!_controller.value.isStreamingImages && mounted) {
+          _startImageStream();
+        }
+      } catch (e) {
+        debugPrint('⚠️ Restart stream error: $e');
+      }
+    }
   }
 
   Future<void> _initCameraAndPose() async {
@@ -287,7 +320,7 @@ class _CameraScreenState extends State<CameraScreen> {
       await _controller.initialize();
       debugPrint('📷 Camera initialized successfully');
       if (mounted) {
-        _initializeCamera();
+        _startImageStream();
       }
     } catch (error) {
       debugPrint('❌ Camera initialization error: $error');
@@ -325,7 +358,7 @@ class _CameraScreenState extends State<CameraScreen> {
     try {
       await _controller.initialize();
       if (mounted) {
-        _initializeCamera();
+        _startImageStream();
       }
     } catch (e) {
       debugPrint('❌ Camera switch error: $e');
@@ -336,9 +369,7 @@ class _CameraScreenState extends State<CameraScreen> {
 
   InputImageRotation _getImageRotation() {
     final sensorOrientation = _currentCamera.sensorOrientation;
-    debugPrint('📐 Sensor orientation: $sensorOrientation');
 
-    // Map common Android sensor orientations to ML Kit rotation
     switch (sensorOrientation) {
       case 90:
         return InputImageRotation.rotation90deg;
@@ -354,15 +385,16 @@ class _CameraScreenState extends State<CameraScreen> {
 
   Future<void> _processImage(CameraImage image) async {
     // Safety check: stop if already processing or widget is disposed
-    if (_isProcessing || !mounted) return;
-    _isProcessing = true;
-    _frameCount++;
+    if (_isProcessing || !mounted || _isCameraDisposed) return;
 
-    // Skip frames for better performance (process every 5th frame to reduce CPU/RAM pressure)
-    if (_frameCount % 5 != 0) {
-      _isProcessing = false;
-      return;
+    // TIME-BASED THROTTLING: Process only if enough time has passed
+    // This ensures consistent 10 FPS regardless of device camera speed
+    final now = DateTime.now();
+    if (now.difference(_lastProcessTime).inMilliseconds < _throttleMs) {
+      return; // Skip this frame, don't set _isProcessing
     }
+    _lastProcessTime = now;
+    _isProcessing = true;
 
     try {
       final WriteBuffer allBytes = WriteBuffer();
@@ -392,36 +424,53 @@ class _CameraScreenState extends State<CameraScreen> {
         _poseDetectedCount++;
         if (_poseDetectedCount % 10 == 0) {
           debugPrint('✅ Pose detected! Total: $_poseDetectedCount');
-          debugPrint('   Landmarks count: ${poses.first.landmarks.length}');
         }
 
         if (mounted) {
           _currentPose = poses.first;
-          _processPose(poses.first);
+
+          // Use WorkoutLogic to process the pose
+          _workoutLogic.process(poses.first);
+
+          // Only call setState if values actually changed
+          _updateUIIfNeeded();
         }
       } else {
-        if (_frameCount % 30 == 0) {
-          debugPrint('⚠️ No pose detected in frame $_frameCount');
-        }
-        if (mounted) {
+        // No pose detected - update feedback if different
+        if (mounted && _prevFeedback != 'No person detected') {
           setState(() {
-            _formFeedback = 'No person detected';
+            _prevFeedback = 'No person detected';
           });
         }
       }
     } catch (e) {
       debugPrint('❌ Error processing image: $e');
-      if (mounted) {
-        setState(() {
-          _formFeedback = 'Error: $e';
-        });
-      }
     } finally {
       _isProcessing = false;
     }
   }
 
-  void _initializeCamera() {
+  /// Only update UI if values have actually changed
+  void _updateUIIfNeeded() {
+    final newFeedback = _workoutLogic.feedback;
+    final newRepCount = _workoutLogic.repCount;
+    final newQuality = _workoutLogic.repQuality;
+    final newProperForm = _workoutLogic.isProperForm;
+
+    if (newFeedback != _prevFeedback ||
+        newRepCount != _prevRepCount ||
+        newQuality != _prevQuality ||
+        newProperForm != _prevProperForm) {
+      setState(() {
+        _prevFeedback = newFeedback;
+        _prevRepCount = newRepCount;
+        _prevQuality = newQuality;
+        _prevProperForm = newProperForm;
+      });
+    }
+  }
+
+  void _startImageStream() {
     debugPrint('🎥 Starting image stream');
     _controller.startImageStream((CameraImage image) {
       _processImage(image);
@@ -445,15 +494,17 @@ class _CameraScreenState extends State<CameraScreen> {
           .doc(user.uid)
           .collection('workouts')
           .add({
-            'exerciseType': widget.exerciseType,
-            'repCount': _repCount,
+            'exerciseType': _workoutLogic.exerciseName,
+            'repCount': _workoutLogic.repCount,
             'timestamp': Timestamp.now(),
             'durationMs': durationMs,
           });
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Session saved to history')),
+          SnackBar(
+            content: Text('${_workoutLogic.exerciseName} session saved!'),
+          ),
         );
       }
     } catch (e) {
@@ -466,319 +517,17 @@ class _CameraScreenState extends State<CameraScreen> {
     }
   }
 
-  /// Routes pose processing to the correct detection method based on exercise type
-  void _processPose(Pose pose) {
-    debugPrint('🏋️ Processing pose for exercise: ${widget.exerciseType}');
-    switch (widget.exerciseType.toLowerCase()) {
-      case 'push-up':
-      case 'pushup':
-      case 'push up':
-        debugPrint('✅ Using PUSH-UP detection');
-        _checkPushUp(pose);
-        break;
-      case 'sit-up':
-      case 'situp':
-      case 'sit up':
-        debugPrint('✅ Using SIT-UP detection');
-        _checkSitUp(pose);
-        break;
-      case 'pull-up':
-      case 'pullup':
-      case 'pull up':
-      default:
-        debugPrint('✅ Using PULL-UP detection');
-        _checkPullUp(pose);
-        break;
-    }
-  }
-
-  /// Push-up detection based on Python PushUpCounter.py algorithm
-  /// Uses elbow angle, shoulder angle, and hip angle
-  void _checkPushUp(Pose pose) {
-    final PoseLandmark? leftShoulder =
-        pose.landmarks[PoseLandmarkType.leftShoulder];
-    final PoseLandmark? leftElbow = pose.landmarks[PoseLandmarkType.leftElbow];
-    final PoseLandmark? leftWrist = pose.landmarks[PoseLandmarkType.leftWrist];
-    final PoseLandmark? leftHip = pose.landmarks[PoseLandmarkType.leftHip];
-    final PoseLandmark? leftKnee = pose.landmarks[PoseLandmarkType.leftKnee];
-
-    if (leftShoulder == null ||
-        leftElbow == null ||
-        leftWrist == null ||
-        leftHip == null ||
-        leftKnee == null) {
-      setState(() {
-        _formFeedback = 'Position your full body in frame';
-      });
-      return;
-    }
-
-    // Calculate angles (matching Python: 11, 13, 15 for elbow)
-    double elbowAngle = _calculateAngle(leftShoulder, leftElbow, leftWrist);
-    // Shoulder angle: elbow → shoulder → hip (13, 11, 23)
-    double shoulderAngle = _calculateAngle(leftElbow, leftShoulder, leftHip);
-    // Hip angle: shoulder → hip → knee (11, 23, 25)
-    double hipAngle = _calculateAngle(leftShoulder, leftHip, leftKnee);
-
-    // Calculate quality based on form
-    double quality = (hipAngle > 140) ? 0.8 : (hipAngle / 180.0);
-
-    setState(() {
-      _repQuality = quality.clamp(0.0, 1.0);
-
-      // Check for proper starting form: elbow > 160, shoulder > 40, hip > 160
-      if (elbowAngle > 160 && shoulderAngle > 40 && hipAngle > 160) {
-        _pushUpForm = 1;
-      }
-
-      if (_pushUpForm == 1) {
-        // DOWN position: elbow <= 90 AND hip > 160 (body straight)
-        if (elbowAngle <= 90 && hipAngle > 160) {
-          _formFeedback = 'Push Up!';
-          _isProperForm = true;
-          if (_pushUpDirection == 0) {
-            _repCount++;
-            _pushUpDirection = 1;
-            debugPrint('💪 Push-up DOWN counted! Total: $_repCount');
-          }
-        }
-        // UP position: elbow > 160, shoulder > 40, hip > 160
-        else if (elbowAngle > 160 && shoulderAngle > 40 && hipAngle > 160) {
-          _formFeedback = 'Go Down!';
-          _isProperForm = true;
-          if (_pushUpDirection == 1) {
-            _pushUpDirection = 0;
-          }
-        } else {
-          _formFeedback = 'Fix Form - Keep body straight';
-          _isProperForm = false;
-        }
-      } else {
-        _formFeedback = 'Get in plank position with arms straight';
-        _isProperForm = false;
-      }
-    });
-  }
-
-  /// Sit-up detection based on Python situp_realtime.py algorithm
-  /// Uses shoulder-hip-knee angle (landmarks 11, 23, 25)
-  void _checkSitUp(Pose pose) {
-    final PoseLandmark? leftShoulder =
-        pose.landmarks[PoseLandmarkType.leftShoulder];
-    final PoseLandmark? leftHip = pose.landmarks[PoseLandmarkType.leftHip];
-    final PoseLandmark? leftKnee = pose.landmarks[PoseLandmarkType.leftKnee];
-
-    if (leftShoulder == null || leftHip == null || leftKnee == null) {
-      setState(() {
-        _formFeedback = 'Position your body in frame (side view)';
-      });
-      return;
-    }
-
-    // Calculate angle: shoulder → hip → knee (11, 23, 25)
-    double angle = _calculateAngle(leftShoulder, leftHip, leftKnee);
-
-    // Calculate quality based on angle
-    double quality = angle < 100 ? 1.0 : (180 - angle) / 80.0;
-
-    setState(() {
-      _repQuality = quality.clamp(0.0, 1.0);
-
-      // DOWN state: angle >= 117 (lying flat)
-      if (angle >= 117) {
-        _sitUpStage = 'down';
-        _formFeedback = 'Sit Up!';
-        _isProperForm = true;
-      }
-
-      // UP state: angle <= 89 AND was in down position
-      if (angle <= 89 && _sitUpStage == 'down') {
-        _sitUpStage = 'up';
-        _repCount++;
-        _formFeedback = 'Great! Go back down';
-        _isProperForm = true;
-        debugPrint('💪 Sit-up counted! Total: $_repCount');
-      } else if (angle > 89 && angle < 117) {
-        _formFeedback = _sitUpStage == 'down'
-            ? 'Keep going up!'
-            : 'Go back down';
-        _isProperForm = false;
-      }
-    });
-  }
-
-  void _checkPullUp(Pose pose) {
-    final PoseLandmark? leftShoulder =
-        pose.landmarks[PoseLandmarkType.leftShoulder];
-    final PoseLandmark? leftElbow = pose.landmarks[PoseLandmarkType.leftElbow];
-    final PoseLandmark? leftWrist = pose.landmarks[PoseLandmarkType.leftWrist];
-    final PoseLandmark? rightShoulder =
-        pose.landmarks[PoseLandmarkType.rightShoulder];
-    final PoseLandmark? rightElbow =
-        pose.landmarks[PoseLandmarkType.rightElbow];
-    final PoseLandmark? rightWrist =
-        pose.landmarks[PoseLandmarkType.rightWrist];
-
-    if (leftShoulder != null &&
-        leftElbow != null &&
-        leftWrist != null &&
-        rightShoulder != null &&
-        rightElbow != null &&
-        rightWrist != null) {
-      bool isProperForm = _isArmsBent(
-        leftShoulder,
-        leftElbow,
-        leftWrist,
-        rightShoulder,
-        rightElbow,
-        rightWrist,
-      );
-
-      double quality = _calculateRepQuality(
-        leftShoulder,
-        leftElbow,
-        leftWrist,
-        rightShoulder,
-        rightElbow,
-        rightWrist,
-      );
-
-      setState(() {
-        _isProperForm = isProperForm;
-        _repQuality = quality;
-
-        if (!isProperForm) {
-          if (quality < 0.3) {
-            _formFeedback = "Keep your shoulders level and face forward";
-          } else if (quality < 0.6) {
-            _formFeedback = "Pull up higher, chin over the bar";
-          } else {
-            _formFeedback = "Almost there! Keep going";
-          }
-        } else {
-          _formFeedback = "Great form!";
-        }
-
-        if (isProperForm && !_isInUpPosition) {
-          final now = DateTime.now();
-          if (_lastRepTime == null ||
-              now.difference(_lastRepTime!) >= _minRepDuration) {
-            _isInUpPosition = true;
-            _repCount++;
-            _lastRepTime = now;
-            debugPrint('💪 Pull-up counted! Total: $_repCount');
-          }
-        } else if (!isProperForm && _isInUpPosition) {
-          _isInUpPosition = false;
-        }
-      });
-    }
-  }
-
-  double _calculateRepQuality(
-    PoseLandmark leftShoulder,
-    PoseLandmark leftElbow,
-    PoseLandmark leftWrist,
-    PoseLandmark rightShoulder,
-    PoseLandmark rightElbow,
-    PoseLandmark rightWrist,
-  ) {
-    double shoulderStability =
-        1.0 -
-        (math.min((leftShoulder.y - rightShoulder.y).abs(), _maxShoulderDiff) /
-            _maxShoulderDiff);
-
-    double leftHeight = math.max(0, (leftShoulder.y - leftWrist.y));
-    double rightHeight = math.max(0, (rightShoulder.y - rightWrist.y));
-    double heightQuality = (leftHeight + rightHeight) / 2.0;
-
-    double leftAngle = _calculateAngle(leftShoulder, leftElbow, leftWrist);
-    double rightAngle = _calculateAngle(rightShoulder, rightElbow, rightWrist);
-    double angleQuality =
-        1.0 - (math.min(leftAngle, rightAngle) / _minArmAngle);
-
-    double confidenceQuality =
-        math.min(
-          math.min(leftShoulder.likelihood, rightShoulder.likelihood),
-          math.min(
-            math.min(leftElbow.likelihood, rightElbow.likelihood),
-            math.min(leftWrist.likelihood, rightWrist.likelihood),
-          ),
-        ) /
-        _minConfidence;
-
-    return (shoulderStability * 0.3 +
-            heightQuality * 0.3 +
-            angleQuality * 0.2 +
-            confidenceQuality * 0.2)
-        .clamp(0.0, 1.0);
-  }
-
-  bool _isArmsBent(
-    PoseLandmark leftShoulder,
-    PoseLandmark leftElbow,
-    PoseLandmark leftWrist,
-    PoseLandmark rightShoulder,
-    PoseLandmark rightElbow,
-    PoseLandmark rightWrist,
-  ) {
-    double leftAngle = _calculateAngle(leftShoulder, leftElbow, leftWrist);
-    double rightAngle = _calculateAngle(rightShoulder, rightElbow, rightWrist);
-
-    double leftWristY = leftWrist.y;
-    double rightWristY = rightWrist.y;
-    double leftShoulderY = leftShoulder.y;
-    double rightShoulderY = rightShoulder.y;
-
-    bool properArmAngles = leftAngle < 60 && rightAngle < 60;
-    bool properHeight =
-        (leftWristY <= leftShoulderY && rightWristY <= rightShoulderY);
-    bool stablePosition = (leftShoulderY - rightShoulderY).abs() < 0.1;
-    bool highConfidence =
-        leftShoulder.likelihood > 0.7 &&
-        rightShoulder.likelihood > 0.7 &&
-        leftElbow.likelihood > 0.7 &&
-        rightElbow.likelihood > 0.7 &&
-        leftWrist.likelihood > 0.7 &&
-        rightWrist.likelihood > 0.7;
-
-    return properArmAngles && properHeight && stablePosition && highConfidence;
-  }
-
-  double _calculateAngle(
-    PoseLandmark shoulder,
-    PoseLandmark elbow,
-    PoseLandmark wrist,
-  ) {
-    double dx1 = shoulder.x - elbow.x;
-    double dy1 = shoulder.y - elbow.y;
-    double dx2 = wrist.x - elbow.x;
-    double dy2 = wrist.y - elbow.y;
-
-    double angle =
-        (180 / math.pi) *
-        math.acos(
-          (dx1 * dx2 + dy1 * dy2) /
-              (math.sqrt((dx1 * dx1 + dy1 * dy1) * (dx2 * dx2 + dy2 * dy2))),
-        );
-
-    return angle;
-  }
-
   Color _getQualityColor(double quality) {
-    if (quality < 0.3) {
-      return Colors.red;
-    } else if (quality < 0.6) {
-      return Colors.orange;
-    } else if (quality < 0.8) {
-      return Colors.yellow;
-    } else {
-      return Colors.green;
-    }
+    if (quality < 0.3) return Colors.red;
+    if (quality < 0.6) return Colors.orange;
+    if (quality < 0.8) return Colors.yellow;
+    return Colors.green;
   }
 
   @override
   Widget build(BuildContext context) {
+    final themeColor = _workoutLogic.themeColor;
+
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, result) async {
@@ -808,7 +557,7 @@ class _CameraScreenState extends State<CameraScreen> {
                               MediaQuery.of(context).size.width,
                               MediaQuery.of(context).size.height,
                             ),
-                            painter: PosePainter(
+                            painter: UnifiedPosePainter(
                               pose: _currentPose!,
                               imageSize: Size(
                                 _controller.value.previewSize!.height,
@@ -819,15 +568,15 @@ class _CameraScreenState extends State<CameraScreen> {
                                 MediaQuery.of(context).size.height,
                               ),
                               cameraLensDirection: _currentCamera.lensDirection,
+                              themeColor: themeColor,
                             ),
                           ),
-                        if (_currentPose != null) const SizedBox.shrink(),
                       ],
                     ),
                   );
                 } else {
-                  return const Center(
-                    child: CircularProgressIndicator(color: Color(0xFF2196F3)),
+                  return Center(
+                    child: CircularProgressIndicator(color: themeColor),
                   );
                 }
               },
@@ -842,7 +591,7 @@ class _CameraScreenState extends State<CameraScreen> {
                   padding: const EdgeInsets.all(24),
                   child: Column(
                     children: [
-                      // Pull-up counter
+                      // Rep counter
                       Container(
                         padding: const EdgeInsets.symmetric(
                           horizontal: 24,
@@ -852,21 +601,21 @@ class _CameraScreenState extends State<CameraScreen> {
                           color: const Color(0xFF1A1F2E).withOpacity(0.95),
                           borderRadius: BorderRadius.circular(20),
                           border: Border.all(
-                            color: const Color(0xFF2196F3).withOpacity(0.3),
+                            color: themeColor.withOpacity(0.3),
                             width: 1,
                           ),
                         ),
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            const Icon(
-                              Icons.fitness_center_rounded,
-                              color: Color(0xFF2196F3),
+                            Icon(
+                              _workoutLogic.icon,
+                              color: themeColor,
                               size: 28,
                             ),
                             const SizedBox(width: 12),
                             Text(
-                              '$_repCount',
+                              '${_workoutLogic.repCount}',
                               style: const TextStyle(
                                 color: Colors.white,
                                 fontSize: 40,
@@ -876,7 +625,7 @@ class _CameraScreenState extends State<CameraScreen> {
                             ),
                             const SizedBox(width: 8),
                             Text(
-                              widget.exerciseType,
+                              _workoutLogic.exerciseName,
                               style: TextStyle(
                                 color: Colors.white.withOpacity(0.6),
                                 fontSize: 16,
@@ -888,14 +637,14 @@ class _CameraScreenState extends State<CameraScreen> {
                       ),
                       const SizedBox(height: 12),
                       // Form feedback
-                      if (_formFeedback.isNotEmpty)
+                      if (_workoutLogic.feedback.isNotEmpty)
                         Container(
                           padding: const EdgeInsets.symmetric(
                             horizontal: 20,
                             vertical: 12,
                           ),
                           decoration: BoxDecoration(
-                            color: _isProperForm
+                            color: _workoutLogic.isProperForm
                                 ? const Color(0xFF4CAF50).withOpacity(0.9)
                                 : const Color(0xFFFF9800).withOpacity(0.9),
                             borderRadius: BorderRadius.circular(16),
@@ -904,7 +653,7 @@ class _CameraScreenState extends State<CameraScreen> {
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               Icon(
-                                _isProperForm
+                                _workoutLogic.isProperForm
                                     ? Icons.check_circle_rounded
                                     : Icons.info_rounded,
                                 color: Colors.white,
@@ -913,7 +662,7 @@ class _CameraScreenState extends State<CameraScreen> {
                               const SizedBox(width: 8),
                               Flexible(
                                 child: Text(
-                                  _formFeedback,
+                                  _workoutLogic.feedback,
                                   textAlign: TextAlign.center,
                                   style: const TextStyle(
                                     color: Colors.white,
@@ -947,9 +696,11 @@ class _CameraScreenState extends State<CameraScreen> {
                                   ),
                                 ),
                                 Text(
-                                  '${(_repQuality * 100).toInt()}%',
+                                  '${(_workoutLogic.repQuality * 100).toInt()}%',
                                   style: TextStyle(
-                                    color: _getQualityColor(_repQuality),
+                                    color: _getQualityColor(
+                                      _workoutLogic.repQuality,
+                                    ),
                                     fontSize: 12,
                                     fontWeight: FontWeight.w700,
                                   ),
@@ -962,12 +713,12 @@ class _CameraScreenState extends State<CameraScreen> {
                               child: SizedBox(
                                 height: 6,
                                 child: LinearProgressIndicator(
-                                  value: _repQuality,
+                                  value: _workoutLogic.repQuality,
                                   backgroundColor: Colors.white.withOpacity(
                                     0.1,
                                   ),
                                   valueColor: AlwaysStoppedAnimation(
-                                    _getQualityColor(_repQuality),
+                                    _getQualityColor(_workoutLogic.repQuality),
                                   ),
                                 ),
                               ),
@@ -989,9 +740,7 @@ class _CameraScreenState extends State<CameraScreen> {
                   decoration: BoxDecoration(
                     color: const Color(0xFF1A1F2E).withOpacity(0.9),
                     shape: BoxShape.circle,
-                    border: Border.all(
-                      color: const Color(0xFF2196F3).withOpacity(0.3),
-                    ),
+                    border: Border.all(color: themeColor.withOpacity(0.3)),
                   ),
                   child: IconButton(
                     onPressed: _switchCamera,
@@ -1038,9 +787,9 @@ class _CameraScreenState extends State<CameraScreen> {
                                   fontWeight: FontWeight.w700,
                                 ),
                               ),
-                              content: const Text(
-                                'Your pull-up count will be saved to history.',
-                                style: TextStyle(color: Colors.white70),
+                              content: Text(
+                                'Your ${_workoutLogic.exerciseName} count will be saved to history.',
+                                style: const TextStyle(color: Colors.white70),
                               ),
                               actions: [
                                 TextButton(

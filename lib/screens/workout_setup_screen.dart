@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
 import 'camera_screen.dart';
-import 'pushup_camera_screen.dart';
-import 'situp_camera_screen.dart';
 
 class WorkoutSetupScreen extends StatefulWidget {
   final CameraDescription camera;
@@ -34,30 +32,17 @@ class _WorkoutSetupScreenState extends State<WorkoutSetupScreen> {
   final List<int> _repsOptions = [8, 10, 12, 15, 20];
 
   void _startWorkout() {
-    Widget screen;
-    switch (_selectedExercise) {
-      case 'Push-Up':
-        screen = PushUpCameraScreen(
+    // Use unified CameraScreen for all exercise types
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => CameraScreen(
           camera: widget.camera,
           cameras: widget.cameras,
-        );
-        break;
-      case 'Sit-Up':
-        screen = SitUpCameraScreen(
-          camera: widget.camera,
-          cameras: widget.cameras,
-        );
-        break;
-      case 'Pull-Up':
-      default:
-        screen = CameraScreen(
-          camera: widget.camera,
-          cameras: widget.cameras,
-          exerciseType: 'Pull-Up',
-        );
-        break;
-    }
-    Navigator.push(context, MaterialPageRoute(builder: (context) => screen));
+          exerciseType: _selectedExercise,
+        ),
+      ),
+    );
   }
 
   @override
