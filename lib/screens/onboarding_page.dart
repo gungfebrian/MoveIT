@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'login_page.dart';
+import '../utils/responsive.dart';
 
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key});
@@ -82,14 +83,14 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           children: [
             // Very subtle ambient light at bottom right to make it "alive"
             Positioned(
-              bottom: -100,
-              right: -50,
+              bottom: -Responsive.height(context, 0.12),
+              right: -Responsive.width(context, 0.12),
               child: Container(
-                width: 300,
-                height: 300,
+                width: Responsive.width(context, 0.7),
+                height: Responsive.width(context, 0.7),
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: _primaryOrange.withOpacity(0.08), // Extremely subtle
+                  color: _primaryOrange.withOpacity(0.08),
                   boxShadow: [
                     BoxShadow(
                       color: _primaryOrange.withOpacity(0.08),
@@ -106,22 +107,22 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 children: [
                   // Top Bar
                   Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 24,
-                      vertical: 16,
+                    padding: EdgeInsets.symmetric(
+                      horizontal: Responsive.padding(context, 0.06),
+                      vertical: Responsive.height(context, 0.02),
                     ),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.end,
                       children: [
                         TextButton(
                           onPressed: _onComplete,
-                          child: const Text(
+                          child: Text(
                             'SKIP',
                             style: TextStyle(
                               color: _textSecondary,
                               fontWeight: FontWeight.w600,
                               letterSpacing: 1,
-                              fontSize: 13,
+                              fontSize: Responsive.text(context, 0.032),
                             ),
                           ),
                         ),
@@ -133,7 +134,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
                   // Content Area
                   SizedBox(
-                    height: 480,
+                    height: Responsive.height(context, 0.55),
                     child: PageView.builder(
                       controller: _pageController,
                       onPageChanged: (index) =>
@@ -142,32 +143,36 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       itemBuilder: (context, index) {
                         final slide = _slides[index];
                         return Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 32),
+                          padding: EdgeInsets.symmetric(
+                            horizontal: Responsive.padding(context, 0.08),
+                          ),
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              // Icon Circle - Clean & Minimal
+                              // Icon Circle
                               Container(
-                                width: 120,
-                                height: 120,
+                                width: Responsive.width(context, 0.28),
+                                height: Responsive.width(context, 0.28),
                                 decoration: BoxDecoration(
                                   color: _surfaceColor,
                                   shape: BoxShape.circle,
                                 ),
                                 child: Icon(
                                   slide['icon'] as IconData,
-                                  size: 48,
+                                  size: Responsive.icon(context, 0.12),
                                   color: _primaryOrange,
                                 ),
                               ),
-                              const SizedBox(height: 64),
+                              SizedBox(
+                                height: Responsive.height(context, 0.08),
+                              ),
 
                               // Title
                               Text(
                                 slide['title'] as String,
                                 textAlign: TextAlign.center,
-                                style: const TextStyle(
-                                  fontSize: 36,
+                                style: TextStyle(
+                                  fontSize: Responsive.text(context, 0.09),
                                   fontWeight: FontWeight.w800,
                                   color: _textPrimary,
                                   fontFamily: 'Inter',
@@ -175,18 +180,20 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                                   height: 1.1,
                                 ),
                               ),
-                              const SizedBox(height: 20),
+                              SizedBox(
+                                height: Responsive.height(context, 0.025),
+                              ),
 
                               // Description
                               Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 16,
+                                padding: EdgeInsets.symmetric(
+                                  horizontal: Responsive.padding(context, 0.04),
                                 ),
                                 child: Text(
                                   slide['description'] as String,
                                   textAlign: TextAlign.center,
-                                  style: const TextStyle(
-                                    fontSize: 17,
+                                  style: TextStyle(
+                                    fontSize: Responsive.text(context, 0.042),
                                     color: _textSecondary,
                                     height: 1.5,
                                     letterSpacing: 0.2,
@@ -204,9 +211,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
                   // Bottom Section
                   Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 32,
-                      vertical: 32,
+                    padding: EdgeInsets.symmetric(
+                      horizontal: Responsive.padding(context, 0.08),
+                      vertical: Responsive.height(context, 0.04),
                     ),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -217,9 +224,13 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                             final isActive = index == _currentSlide;
                             return AnimatedContainer(
                               duration: const Duration(milliseconds: 300),
-                              margin: const EdgeInsets.only(right: 8),
+                              margin: EdgeInsets.only(
+                                right: Responsive.width(context, 0.02),
+                              ),
                               height: 6,
-                              width: isActive ? 24 : 6,
+                              width: isActive
+                                  ? Responsive.width(context, 0.06)
+                                  : 6,
                               decoration: BoxDecoration(
                                 color: isActive
                                     ? _primaryOrange
@@ -237,9 +248,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                             backgroundColor: _primaryOrange,
                             foregroundColor: Colors.white,
                             elevation: 0,
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 24,
-                              vertical: 16,
+                            padding: EdgeInsets.symmetric(
+                              horizontal: Responsive.padding(context, 0.06),
+                              vertical: Responsive.height(context, 0.02),
                             ),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(24),
@@ -251,17 +262,19 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                                 _currentSlide == _slides.length - 1
                                     ? 'START'
                                     : 'NEXT',
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontWeight: FontWeight.w700,
                                   letterSpacing: 0.5,
-                                  fontSize: 14,
+                                  fontSize: Responsive.text(context, 0.035),
                                 ),
                               ),
                               if (_currentSlide != _slides.length - 1) ...[
-                                const SizedBox(width: 8),
-                                const Icon(
+                                SizedBox(
+                                  width: Responsive.width(context, 0.02),
+                                ),
+                                Icon(
                                   Icons.arrow_forward_rounded,
-                                  size: 18,
+                                  size: Responsive.icon(context, 0.045),
                                 ),
                               ],
                             ],

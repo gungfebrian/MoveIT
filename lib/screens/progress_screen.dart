@@ -6,6 +6,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../theme/app_theme.dart';
 import '../services/streak_service.dart';
+import '../utils/responsive.dart';
 
 class ProgressScreen extends StatefulWidget {
   const ProgressScreen({super.key});
@@ -32,20 +33,22 @@ class _ProgressScreenState extends State<ProgressScreen> {
       body: SafeArea(
         child: SingleChildScrollView(
           physics: const BouncingScrollPhysics(),
-          padding: const EdgeInsets.symmetric(horizontal: 20),
+          padding: EdgeInsets.symmetric(
+            horizontal: Responsive.padding(context, 0.05),
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Header
-              _buildHeader(),
+              _buildHeader(context),
 
-              const SizedBox(height: 12),
+              SizedBox(height: Responsive.height(context, 0.015)),
 
               // Title
-              const Text(
+              Text(
                 'Track your\nfitness progress',
                 style: TextStyle(
-                  fontSize: 32,
+                  fontSize: Responsive.text(context, 0.08),
                   fontWeight: FontWeight.w800,
                   fontFamily: 'Inter',
                   color: Colors.white,
@@ -54,25 +57,25 @@ class _ProgressScreenState extends State<ProgressScreen> {
                 ),
               ),
 
-              const SizedBox(height: 32),
+              SizedBox(height: Responsive.height(context, 0.04)),
 
               // Stats Cards
-              if (user != null) _buildStatsCards(user.uid),
+              if (user != null) _buildStatsCards(context, user.uid),
 
-              const SizedBox(height: 32),
+              SizedBox(height: Responsive.height(context, 0.04)),
 
               // Streak Section
-              if (user != null) _buildStreakSection(),
+              if (user != null) _buildStreakSection(context),
 
-              const SizedBox(height: 40),
+              SizedBox(height: Responsive.height(context, 0.05)),
 
               // Your Journey Section
-              if (user != null) _buildJourneySection(user.uid),
+              if (user != null) _buildJourneySection(context, user.uid),
 
               // Login prompt for non-logged in users
-              if (user == null) _buildLoginPrompt(),
+              if (user == null) _buildLoginPrompt(context),
 
-              const SizedBox(height: 100),
+              SizedBox(height: Responsive.height(context, 0.12)),
             ],
           ),
         ),
@@ -80,22 +83,23 @@ class _ProgressScreenState extends State<ProgressScreen> {
     );
   }
 
-  Widget _buildHeader() {
+  Widget _buildHeader(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 16),
+      padding: EdgeInsets.symmetric(vertical: Responsive.height(context, 0.02)),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           // Back button
           _buildCircleButton(
+            context: context,
             icon: Icons.chevron_left_rounded,
             onTap: () => Navigator.pop(context),
           ),
 
-          const Text(
+          Text(
             'Progress',
             style: TextStyle(
-              fontSize: 16,
+              fontSize: Responsive.text(context, 0.04),
               fontWeight: FontWeight.w600,
               fontFamily: 'Inter',
               color: Colors.white,
@@ -104,9 +108,10 @@ class _ProgressScreenState extends State<ProgressScreen> {
 
           // Notification icon
           _buildCircleButton(
+            context: context,
             icon: Icons.notifications_none_rounded,
             onTap: () {},
-            size: 24,
+            size: Responsive.icon(context, 0.06),
           ),
         ],
       ),
@@ -114,22 +119,27 @@ class _ProgressScreenState extends State<ProgressScreen> {
   }
 
   Widget _buildCircleButton({
+    required BuildContext context,
     required IconData icon,
     VoidCallback? onTap,
-    double size = 28,
+    double? size,
   }) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        width: 44,
-        height: 44,
+        width: Responsive.width(context, 0.11),
+        height: Responsive.width(context, 0.11),
         decoration: BoxDecoration(color: pCardBg, shape: BoxShape.circle),
-        child: Icon(icon, color: Colors.white, size: size),
+        child: Icon(
+          icon,
+          color: Colors.white,
+          size: size ?? Responsive.icon(context, 0.07),
+        ),
       ),
     );
   }
 
-  Widget _buildStatsCards(String userId) {
+  Widget _buildStatsCards(BuildContext context, String userId) {
     return FutureBuilder<Map<String, int>>(
       future: _fetchStats(userId),
       builder: (context, snapshot) {
@@ -138,41 +148,57 @@ class _ProgressScreenState extends State<ProgressScreen> {
 
         return Row(
           children: [
-            Expanded(child: _buildStatCard('Workouts', '${stats['workouts']}')),
-            const SizedBox(width: 14),
-            Expanded(child: _buildStatCard('Minutes', '${stats['minutes']}')),
-            const SizedBox(width: 14),
-            Expanded(child: _buildStatCard('Calories', '${stats['calories']}')),
+            Expanded(
+              child: _buildStatCard(
+                context,
+                'Workouts',
+                '${stats['workouts']}',
+              ),
+            ),
+            SizedBox(width: Responsive.width(context, 0.035)),
+            Expanded(
+              child: _buildStatCard(context, 'Minutes', '${stats['minutes']}'),
+            ),
+            SizedBox(width: Responsive.width(context, 0.035)),
+            Expanded(
+              child: _buildStatCard(
+                context,
+                'Calories',
+                '${stats['calories']}',
+              ),
+            ),
           ],
         );
       },
     );
   }
 
-  Widget _buildStatCard(String label, String value) {
+  Widget _buildStatCard(BuildContext context, String label, String value) {
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 12),
+      padding: EdgeInsets.symmetric(
+        vertical: Responsive.height(context, 0.025),
+        horizontal: Responsive.width(context, 0.03),
+      ),
       decoration: BoxDecoration(
         color: pCardBg,
         borderRadius: BorderRadius.circular(20),
-        // No border as per reference
       ),
       child: Column(
         children: [
           Text(
             label,
             style: TextStyle(
-              fontSize: 13,
+              fontSize: Responsive.text(context, 0.032),
               fontWeight: FontWeight.w500,
               fontFamily: 'Inter',
               color: Colors.white.withOpacity(0.5),
             ),
           ),
-          const SizedBox(height: 8),
+          SizedBox(height: Responsive.height(context, 0.01)),
           Text(
             value,
-            style: const TextStyle(
-              fontSize: 22,
+            style: TextStyle(
+              fontSize: Responsive.text(context, 0.055),
               fontWeight: FontWeight.w700,
               fontFamily: 'Inter',
               color: Colors.white,
@@ -183,7 +209,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
     );
   }
 
-  Widget _buildStreakSection() {
+  Widget _buildStreakSection(BuildContext context) {
     return StreamBuilder<Map<String, int>>(
       stream: _streakService.getStreakStream(),
       builder: (context, snapshot) {
@@ -194,18 +220,20 @@ class _ProgressScreenState extends State<ProgressScreen> {
           children: [
             Expanded(
               child: _buildStreakItem(
+                context: context,
                 label: 'Current streak',
                 value: currentStreak,
                 iconColor: primaryOrange,
                 icon: Icons.local_fire_department_rounded,
               ),
             ),
-            const SizedBox(width: 20),
+            SizedBox(width: Responsive.width(context, 0.05)),
             Expanded(
               child: _buildStreakItem(
+                context: context,
                 label: 'Best streak',
                 value: bestStreak,
-                iconColor: const Color(0xFF007AFF), // Apple Blue
+                iconColor: const Color(0xFF007AFF),
                 icon: Icons.water_drop_rounded,
               ),
             ),
@@ -216,6 +244,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
   }
 
   Widget _buildStreakItem({
+    required BuildContext context,
     required String label,
     required int value,
     required Color iconColor,
@@ -226,12 +255,12 @@ class _ProgressScreenState extends State<ProgressScreen> {
       children: [
         Row(
           children: [
-            Icon(icon, color: iconColor, size: 20),
-            const SizedBox(width: 8),
+            Icon(icon, color: iconColor, size: Responsive.icon(context, 0.05)),
+            SizedBox(width: Responsive.width(context, 0.02)),
             Text(
               label,
-              style: const TextStyle(
-                fontSize: 14,
+              style: TextStyle(
+                fontSize: Responsive.text(context, 0.035),
                 fontWeight: FontWeight.w500,
                 color: Colors.white,
                 fontFamily: 'Inter',
@@ -239,15 +268,15 @@ class _ProgressScreenState extends State<ProgressScreen> {
             ),
           ],
         ),
-        const SizedBox(height: 8),
+        SizedBox(height: Responsive.height(context, 0.01)),
         Row(
           crossAxisAlignment: CrossAxisAlignment.baseline,
           textBaseline: TextBaseline.alphabetic,
           children: [
             Text(
               '$value ',
-              style: const TextStyle(
-                fontSize: 32,
+              style: TextStyle(
+                fontSize: Responsive.text(context, 0.08),
                 fontWeight: FontWeight.w800,
                 fontFamily: 'Inter',
                 color: Colors.white,
@@ -257,7 +286,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
             Text(
               'days',
               style: TextStyle(
-                fontSize: 15,
+                fontSize: Responsive.text(context, 0.038),
                 fontWeight: FontWeight.w500,
                 fontFamily: 'Inter',
                 color: Colors.white.withOpacity(0.5),
@@ -269,7 +298,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
     );
   }
 
-  Widget _buildJourneySection(String userId) {
+  Widget _buildJourneySection(BuildContext context, String userId) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [

@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../services/auth_service.dart';
 import 'login_page.dart';
 import 'settings_screen.dart';
+import '../utils/responsive.dart';
 
 class ProfileTab extends StatefulWidget {
   const ProfileTab({super.key});
@@ -145,17 +146,19 @@ class _ProfileTabState extends State<ProfileTab> {
       body: SafeArea(
         child: SingleChildScrollView(
           physics: const BouncingScrollPhysics(),
-          padding: const EdgeInsets.symmetric(horizontal: 24),
+          padding: EdgeInsets.symmetric(
+            horizontal: Responsive.padding(context, 0.06),
+          ),
           child: Column(
             children: [
-              const SizedBox(height: 20),
+              SizedBox(height: Responsive.height(context, 0.025)),
               // Profile Header
-              _buildProfileHeader(displayName, email),
-              const SizedBox(height: 32),
+              _buildProfileHeader(context, displayName, email),
+              SizedBox(height: Responsive.height(context, 0.04)),
 
               // Stats Row
-              _buildStatsRow(),
-              const SizedBox(height: 32),
+              _buildStatsRow(context),
+              SizedBox(height: Responsive.height(context, 0.04)),
 
               // Menu Options
               Container(
@@ -191,11 +194,13 @@ class _ProfileTabState extends State<ProfileTab> {
                   ],
                 ),
               ),
-              const SizedBox(height: 24),
+              SizedBox(height: Responsive.height(context, 0.03)),
 
               // Logout Button
-              _buildLogoutButton(),
-              const SizedBox(height: 100), // Space for navbar
+              _buildLogoutButton(context),
+              SizedBox(
+                height: Responsive.height(context, 0.12),
+              ), // Space for navbar
             ],
           ),
         ),
@@ -203,12 +208,12 @@ class _ProfileTabState extends State<ProfileTab> {
     );
   }
 
-  Widget _buildProfileHeader(String name, String email) {
+  Widget _buildProfileHeader(BuildContext context, String name, String email) {
     return Column(
       children: [
         Container(
-          width: 120,
-          height: 120,
+          width: Responsive.width(context, 0.28),
+          height: Responsive.width(context, 0.28),
           decoration: BoxDecoration(
             shape: BoxShape.circle,
             border: Border.all(color: primaryOrange, width: 3),
@@ -224,28 +229,28 @@ class _ProfileTabState extends State<ProfileTab> {
           child: ClipOval(
             child: _localPhotoPath != null
                 ? Image.file(File(_localPhotoPath!), fit: BoxFit.cover)
-                : const Icon(
+                : Icon(
                     Icons.person_rounded,
-                    size: 60,
+                    size: Responsive.icon(context, 0.15),
                     color: Colors.white,
                   ),
           ),
         ),
-        const SizedBox(height: 20),
+        SizedBox(height: Responsive.height(context, 0.025)),
         Text(
           name,
-          style: const TextStyle(
-            fontSize: 24,
+          style: TextStyle(
+            fontSize: Responsive.text(context, 0.06),
             fontWeight: FontWeight.w700,
             color: Colors.white,
             fontFamily: 'Inter',
           ),
         ),
-        const SizedBox(height: 8),
+        SizedBox(height: Responsive.height(context, 0.01)),
         Text(
           email,
           style: TextStyle(
-            fontSize: 14,
+            fontSize: Responsive.text(context, 0.035),
             color: Colors.white.withOpacity(0.5),
             fontFamily: 'Inter',
           ),
@@ -254,34 +259,38 @@ class _ProfileTabState extends State<ProfileTab> {
     );
   }
 
-  Widget _buildStatsRow() {
+  Widget _buildStatsRow(BuildContext context) {
     return Row(
       children: [
         Expanded(
-          child: _buildStatItem('Workouts', '${_userStats['workouts']}'),
+          child: _buildStatItem(
+            context,
+            'Workouts',
+            '${_userStats['workouts']}',
+          ),
         ),
         Container(width: 1, height: 40, color: Colors.white.withOpacity(0.1)),
-        Expanded(child: _buildStatItem('Check-in', 'Daily')),
+        Expanded(child: _buildStatItem(context, 'Check-in', 'Daily')),
       ],
     );
   }
 
-  Widget _buildStatItem(String label, String value) {
+  Widget _buildStatItem(BuildContext context, String label, String value) {
     return Column(
       children: [
         Text(
           value,
-          style: const TextStyle(
-            fontSize: 24,
+          style: TextStyle(
+            fontSize: Responsive.text(context, 0.06),
             fontWeight: FontWeight.w800,
             color: primaryOrange,
           ),
         ),
-        const SizedBox(height: 4),
+        SizedBox(height: Responsive.height(context, 0.005)),
         Text(
           label,
           style: TextStyle(
-            fontSize: 12,
+            fontSize: Responsive.text(context, 0.03),
             fontWeight: FontWeight.w500,
             color: Colors.white.withOpacity(0.5),
             letterSpacing: 0.5,
@@ -343,7 +352,7 @@ class _ProfileTabState extends State<ProfileTab> {
     );
   }
 
-  Widget _buildLogoutButton() {
+  Widget _buildLogoutButton(BuildContext context) {
     return SizedBox(
       width: double.infinity,
       child: TextButton(
@@ -358,17 +367,19 @@ class _ProfileTabState extends State<ProfileTab> {
           }
         },
         style: TextButton.styleFrom(
-          padding: const EdgeInsets.symmetric(vertical: 16),
+          padding: EdgeInsets.symmetric(
+            vertical: Responsive.height(context, 0.02),
+          ),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(20),
           ),
           backgroundColor: const Color(0xFF2A1215), // Dark Red
         ),
-        child: const Text(
+        child: Text(
           'Log Out',
           style: TextStyle(
-            color: Color(0xFFFF4545),
-            fontSize: 16,
+            color: const Color(0xFFFF4545),
+            fontSize: Responsive.text(context, 0.04),
             fontWeight: FontWeight.w700,
           ),
         ),
