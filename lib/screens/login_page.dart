@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'home_page.dart';
 import 'register_page.dart';
 import '../services/auth_service.dart';
+import '../utils/responsive.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -69,11 +70,11 @@ class _LoginPageState extends State<LoginPage> {
         children: [
           // Background "Glow" for depth
           Positioned(
-            top: -100,
-            right: -100,
+            top: -Responsive.height(context, 0.1),
+            right: -Responsive.width(context, 0.2),
             child: Container(
-              width: 300,
-              height: 300,
+              width: Responsive.width(context, 0.7),
+              height: Responsive.width(context, 0.7),
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: _primaryOrange.withOpacity(0.08),
@@ -88,7 +89,7 @@ class _LoginPageState extends State<LoginPage> {
                 Expanded(
                   flex: 4,
                   child: Container(
-                    margin: const EdgeInsets.all(20),
+                    margin: EdgeInsets.all(Responsive.padding(context, 0.05)),
                     width: double.infinity,
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(32),
@@ -146,7 +147,9 @@ class _LoginPageState extends State<LoginPage> {
                 Expanded(
                   flex: 5,
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 28),
+                    padding: EdgeInsets.symmetric(
+                      horizontal: Responsive.padding(context, 0.07),
+                    ),
                     child: Column(
                       children: [
                         Expanded(
@@ -163,8 +166,8 @@ class _LoginPageState extends State<LoginPage> {
                                   Text(
                                     slide['title'],
                                     textAlign: TextAlign.center,
-                                    style: const TextStyle(
-                                      fontSize: 34,
+                                    style: TextStyle(
+                                      fontSize: Responsive.text(context, 0.085),
                                       fontWeight: FontWeight.w900,
                                       letterSpacing: -1,
                                       color: _textPrimary,
@@ -172,12 +175,14 @@ class _LoginPageState extends State<LoginPage> {
                                       fontFamily: 'Inter',
                                     ),
                                   ),
-                                  const SizedBox(height: 16),
+                                  SizedBox(
+                                    height: Responsive.height(context, 0.02),
+                                  ),
                                   Text(
                                     slide['subtitle'],
                                     textAlign: TextAlign.center,
-                                    style: const TextStyle(
-                                      fontSize: 16,
+                                    style: TextStyle(
+                                      fontSize: Responsive.text(context, 0.04),
                                       color: _textSecondary,
                                       height: 1.5,
                                     ),
@@ -211,6 +216,7 @@ class _LoginPageState extends State<LoginPage> {
 
                         // Action Buttons
                         _buildButton(
+                          context: context,
                           text: 'GET STARTED',
                           onPressed: () => Navigator.push(
                             context,
@@ -220,8 +226,9 @@ class _LoginPageState extends State<LoginPage> {
                           ),
                           isPrimary: true,
                         ),
-                        const SizedBox(height: 12),
+                        SizedBox(height: Responsive.height(context, 0.015)),
                         _buildButton(
+                          context: context,
                           text: 'SIGN IN',
                           onPressed: _showLoginModal,
                           isPrimary: false,
@@ -256,13 +263,14 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   Widget _buildButton({
+    required BuildContext context,
     required String text,
     required VoidCallback onPressed,
     bool isPrimary = true,
   }) {
     return SizedBox(
       width: double.infinity,
-      height: 60,
+      height: Responsive.height(context, 0.07),
       child: isPrimary
           ? ElevatedButton(
               onPressed: onPressed,
@@ -276,9 +284,10 @@ class _LoginPageState extends State<LoginPage> {
               ),
               child: Text(
                 text,
-                style: const TextStyle(
+                style: TextStyle(
                   fontWeight: FontWeight.w800,
                   letterSpacing: 1.2,
+                  fontSize: Responsive.text(context, 0.035),
                 ),
               ),
             )
@@ -296,9 +305,10 @@ class _LoginPageState extends State<LoginPage> {
               ),
               child: Text(
                 text,
-                style: const TextStyle(
+                style: TextStyle(
                   fontWeight: FontWeight.w800,
                   letterSpacing: 1.2,
+                  fontSize: Responsive.text(context, 0.035),
                 ),
               ),
             ),
@@ -325,7 +335,12 @@ class _LoginBottomSheetState extends State<_LoginBottomSheet> {
     final bottomPadding = MediaQuery.of(context).viewInsets.bottom;
 
     return Container(
-      padding: EdgeInsets.fromLTRB(28, 20, 28, 28 + bottomPadding),
+      padding: EdgeInsets.fromLTRB(
+        Responsive.padding(context, 0.07),
+        Responsive.height(context, 0.025),
+        Responsive.padding(context, 0.07),
+        Responsive.height(context, 0.035) + bottomPadding,
+      ),
       decoration: const BoxDecoration(
         color: Color(0xFF14141C),
         borderRadius: BorderRadius.vertical(top: Radius.circular(36)),
@@ -337,7 +352,7 @@ class _LoginBottomSheetState extends State<_LoginBottomSheet> {
           children: [
             Center(
               child: Container(
-                width: 45,
+                width: Responsive.width(context, 0.12),
                 height: 5,
                 decoration: BoxDecoration(
                   color: Colors.white24,
@@ -345,27 +360,30 @@ class _LoginBottomSheetState extends State<_LoginBottomSheet> {
                 ),
               ),
             ),
-            const SizedBox(height: 32),
-            const Text(
+            SizedBox(height: Responsive.height(context, 0.04)),
+            Text(
               'Welcome Back',
               style: TextStyle(
-                fontSize: 28,
+                fontSize: Responsive.text(context, 0.07),
                 fontWeight: FontWeight.w900,
                 color: Colors.white,
               ),
             ),
-            const Text(
+            Text(
               'Resume your evolution.',
-              style: TextStyle(color: Colors.white54, fontSize: 16),
+              style: TextStyle(
+                color: Colors.white54,
+                fontSize: Responsive.text(context, 0.04),
+              ),
             ),
-            const SizedBox(height: 32),
+            SizedBox(height: Responsive.height(context, 0.04)),
 
             _buildField(
               controller: _email,
               hint: 'Email',
               icon: Icons.alternate_email_rounded,
             ),
-            const SizedBox(height: 16),
+            SizedBox(height: Responsive.height(context, 0.02)),
             _buildField(
               controller: _pass,
               hint: 'Password',
@@ -380,10 +398,10 @@ class _LoginBottomSheetState extends State<_LoginBottomSheet> {
               ),
             ),
 
-            const SizedBox(height: 32),
+            SizedBox(height: Responsive.height(context, 0.04)),
             SizedBox(
               width: double.infinity,
-              height: 60,
+              height: Responsive.height(context, 0.07),
               child: ElevatedButton(
                 onPressed: _loading ? null : _handleLogin,
                 style: ElevatedButton.styleFrom(
@@ -393,24 +411,25 @@ class _LoginBottomSheetState extends State<_LoginBottomSheet> {
                   ),
                 ),
                 child: _loading
-                    ? const SizedBox(
-                        width: 24,
-                        height: 24,
-                        child: CircularProgressIndicator(
+                    ? SizedBox(
+                        width: Responsive.icon(context, 0.06),
+                        height: Responsive.icon(context, 0.06),
+                        child: const CircularProgressIndicator(
                           color: Colors.white,
                           strokeWidth: 2,
                         ),
                       )
-                    : const Text(
+                    : Text(
                         'SIGN IN',
                         style: TextStyle(
                           fontWeight: FontWeight.w800,
                           color: Colors.white,
+                          fontSize: Responsive.text(context, 0.035),
                         ),
                       ),
               ),
             ),
-            const SizedBox(height: 16),
+            SizedBox(height: Responsive.height(context, 0.02)),
             // Social Login
             Center(
               child: TextButton.icon(

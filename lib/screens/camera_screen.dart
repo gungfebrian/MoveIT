@@ -5,8 +5,10 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 import '../services/settings_service.dart';
+import '../services/audio_feedback_service.dart';
 import '../logic/workout_logic.dart';
 import '../logic/pose_smoother.dart';
+import '../widgets/countdown_overlay.dart';
 
 /// Unified Camera Screen for all workout types.
 /// Uses WorkoutLogic strategy pattern for exercise-specific detection.
@@ -210,6 +212,12 @@ class _CameraScreenState extends State<CameraScreen>
   // Pose smoother for reducing landmark jitter (3 frame moving average)
   final PoseSmoother _poseSmoother = PoseSmoother(windowSize: 3);
 
+  // Audio feedback service
+  final AudioFeedbackService _audioService = AudioFeedbackService();
+
+  // Countdown state - don't process until countdown completes
+  bool _isCountdownComplete = false;
+
   // Cache previous values to avoid unnecessary setState
   String _prevFeedback = '';
   int _prevRepCount = 0;
@@ -229,6 +237,9 @@ class _CameraScreenState extends State<CameraScreen>
     // Create the appropriate workout logic based on exercise type
     _workoutLogic = WorkoutLogicFactory.create(widget.exerciseType);
     debugPrint('✅ Using ${_workoutLogic.exerciseName} detection logic');
+
+    // Initialize audio feedback
+    _audioService.init();
 
     _initializeControllerFuture = _initCameraAndPose();
   }
@@ -388,8 +399,9 @@ class _CameraScreenState extends State<CameraScreen>
   }
 
   Future<void> _processImage(CameraImage image) async {
-    // Safety check: stop if already processing or widget is disposed
-    if (_isProcessing || !mounted || _isCameraDisposed) return;
+    // Safety check: stop if already processing, disposed, or countdown not complete
+    if (_isProcessing || !mounted || _isCameraDisposed || !_isCountdownComplete)
+      return;
 
     // TIME-BASED THROTTLING: Process only if enough time has passed
     // This ensures consistent 10 FPS regardless of device camera speed
@@ -470,6 +482,11 @@ class _CameraScreenState extends State<CameraScreen>
     final newQuality = _workoutLogic.repQuality;
     final newProperForm = _workoutLogic.isProperForm;
 
+    // Announce rep if count changed
+    if (newRepCount != _prevRepCount && newRepCount > 0) {
+      _audioService.announceRep(newRepCount);
+    }
+
     if (newFeedback != _prevFeedback ||
         newRepCount != _prevRepCount ||
         newQuality != _prevQuality ||
@@ -481,6 +498,14 @@ class _CameraScreenState extends State<CameraScreen>
         _prevProperForm = newProperForm;
       });
     }
+  }
+
+  /// Called when countdown completes
+  void _onCountdownComplete() {
+    debugPrint('🎯 Countdown complete - starting workout!');
+    setState(() {
+      _isCountdownComplete = true;
+    });
   }
 
   void _startImageStream() {
@@ -868,6 +893,13 @@ class _CameraScreenState extends State<CameraScreen>
                 ),
               ),
             ),
+            // Countdown overlay - shown before workout starts
+            if (!_isCountdownComplete)
+              CountdownOverlay(
+                onComplete: _onCountdownComplete,
+                seconds: 3,
+                themeColor: themeColor,
+              ),
           ],
         ),
       ),

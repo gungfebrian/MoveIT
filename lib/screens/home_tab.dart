@@ -8,6 +8,7 @@ import 'all_workouts_screen.dart';
 import '../services/auth_service.dart';
 import '../services/streak_service.dart';
 import 'login_page.dart';
+import '../utils/responsive.dart';
 
 class HomeTab extends StatefulWidget {
   const HomeTab({super.key});
@@ -87,28 +88,32 @@ class _HomeTabState extends State<HomeTab> {
               // Header with greeting
               _buildHeader(),
 
-              const SizedBox(height: 24),
+              SizedBox(height: Responsive.height(context, 0.03)),
 
               // Streak Section
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
+                padding: EdgeInsets.symmetric(
+                  horizontal: Responsive.padding(context, 0.05),
+                ),
                 child: _buildStreakSection(),
               ),
 
-              const SizedBox(height: 24),
+              SizedBox(height: Responsive.height(context, 0.03)),
 
               // Stats Cards Row
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
+                padding: EdgeInsets.symmetric(
+                  horizontal: Responsive.padding(context, 0.05),
+                ),
                 child: _buildStatsCards(),
               ),
 
-              const SizedBox(height: 32),
+              SizedBox(height: Responsive.height(context, 0.04)),
 
               // Today's Workouts Section
               _buildTodaysWorkoutsSection(),
 
-              const SizedBox(height: 100),
+              SizedBox(height: Responsive.height(context, 0.12)),
             ],
           ),
         ),
@@ -120,13 +125,18 @@ class _HomeTabState extends State<HomeTab> {
     final user = FirebaseAuth.instance.currentUser;
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+      padding: EdgeInsets.fromLTRB(
+        Responsive.padding(context, 0.05),
+        Responsive.height(context, 0.02),
+        Responsive.padding(context, 0.05),
+        0,
+      ),
       child: Row(
         children: [
           // Profile Avatar
           Container(
-            width: 48,
-            height: 48,
+            width: Responsive.width(context, 0.12),
+            height: Responsive.width(context, 0.12),
             decoration: BoxDecoration(
               color: cardBg,
               shape: BoxShape.circle,
@@ -150,17 +160,17 @@ class _HomeTabState extends State<HomeTab> {
                       errorBuilder: (_, __, ___) => Icon(
                         Icons.person_rounded,
                         color: Colors.white.withOpacity(0.5),
-                        size: 24,
+                        size: Responsive.icon(context, 0.06),
                       ),
                     )
                   : Icon(
                       Icons.person_rounded,
                       color: Colors.white.withOpacity(0.5),
-                      size: 24,
+                      size: Responsive.icon(context, 0.06),
                     ),
             ),
           ),
-          const SizedBox(width: 16),
+          SizedBox(width: Responsive.width(context, 0.04)),
           // Greeting
           Expanded(
             child: Column(
@@ -169,16 +179,16 @@ class _HomeTabState extends State<HomeTab> {
                 Text(
                   '${_getGreeting()}, $_userName',
                   style: TextStyle(
-                    fontSize: 15,
+                    fontSize: Responsive.text(context, 0.038),
                     color: Colors.white.withOpacity(0.7),
                     fontWeight: FontWeight.w500,
                   ),
                 ),
-                const SizedBox(height: 4),
-                const Text(
+                SizedBox(height: Responsive.height(context, 0.005)),
+                Text(
                   "Let's crush it! 💪",
                   style: TextStyle(
-                    fontSize: 20,
+                    fontSize: Responsive.text(context, 0.05),
                     fontWeight: FontWeight.w800,
                     color: Colors.white,
                     letterSpacing: -0.5,
@@ -189,8 +199,8 @@ class _HomeTabState extends State<HomeTab> {
           ),
           // Notification Bell
           Container(
-            width: 44,
-            height: 44,
+            width: Responsive.width(context, 0.11),
+            height: Responsive.width(context, 0.11),
             decoration: BoxDecoration(
               color: cardBg.withOpacity(0.5),
               shape: BoxShape.circle,
@@ -199,7 +209,7 @@ class _HomeTabState extends State<HomeTab> {
             child: Icon(
               Icons.notifications_outlined,
               color: Colors.white.withOpacity(0.7),
-              size: 22,
+              size: Responsive.icon(context, 0.055),
             ),
           ),
         ],
