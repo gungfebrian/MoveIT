@@ -340,8 +340,9 @@ class _CameraScreenState extends State<CameraScreen>
 
     _controller = CameraController(
       _currentCamera,
-      ResolutionPreset.medium, // Use low resolution to reduce memory pressure
+      ResolutionPreset.medium,
       enableAudio: false,
+      // YUV420 - we convert to NV21 manually in _convertYUV420ToNV21
       imageFormatGroup: ImageFormatGroup.yuv420,
     );
 
@@ -412,6 +413,48 @@ class _CameraScreenState extends State<CameraScreen>
     }
   }
 
+  /// Convert YUV_420_888 (Android camera format) to NV21 for ML Kit
+  /// This handles the byte stride/padding issues that cause IllegalArgumentException
+  Uint8List _convertYUV420ToNV21(CameraImage image) {
+    final int width = image.width;
+    final int height = image.height;
+
+    final yPlane = image.planes[0];
+    final uPlane = image.planes[1];
+    final vPlane = image.planes[2];
+
+    final int yRowStride = yPlane.bytesPerRow;
+    final int uvRowStride = uPlane.bytesPerRow;
+    final int uvPixelStride = uPlane.bytesPerPixel ?? 1;
+
+    // NV21 format: Y plane followed by interleaved VU
+    final int nv21Size = width * height + (width * height ~/ 2);
+    final Uint8List nv21 = Uint8List(nv21Size);
+
+    // Copy Y plane (handle row stride/padding)
+    int yIndex = 0;
+    for (int row = 0; row < height; row++) {
+      for (int col = 0; col < width; col++) {
+        nv21[yIndex++] = yPlane.bytes[row * yRowStride + col];
+      }
+    }
+
+    // Copy UV planes interleaved as VU (NV21 format)
+    final int uvHeight = height ~/ 2;
+    final int uvWidth = width ~/ 2;
+    int uvIndex = width * height;
+
+    for (int row = 0; row < uvHeight; row++) {
+      for (int col = 0; col < uvWidth; col++) {
+        final int uvOffset = row * uvRowStride + col * uvPixelStride;
+        nv21[uvIndex++] = vPlane.bytes[uvOffset]; // V first (NV21)
+        nv21[uvIndex++] = uPlane.bytes[uvOffset]; // Then U
+      }
+    }
+
+    return nv21;
+  }
+
   Future<void> _processImage(CameraImage image) async {
     // Safety check: stop if already processing, disposed, or countdown not complete
     if (_isProcessing || !mounted || _isCameraDisposed || !_isCountdownComplete)
@@ -427,11 +470,8 @@ class _CameraScreenState extends State<CameraScreen>
     _isProcessing = true;
 
     try {
-      final WriteBuffer allBytes = WriteBuffer();
-      for (final Plane plane in image.planes) {
-        allBytes.putUint8List(plane.bytes);
-      }
-      final bytes = allBytes.done().buffer.asUint8List();
+      // Convert YUV_420_888 to NV21 format that ML Kit expects
+      final Uint8List nv21Bytes = _convertYUV420ToNV21(image);
 
       final Size imageSize = Size(
         image.width.toDouble(),
@@ -439,12 +479,12 @@ class _CameraScreenState extends State<CameraScreen>
       );
 
       final inputImage = InputImage.fromBytes(
-        bytes: bytes,
+        bytes: nv21Bytes,
         metadata: InputImageMetadata(
           size: imageSize,
           rotation: _getImageRotation(),
-          format: InputImageFormat.yuv420,
-          bytesPerRow: image.planes[0].bytesPerRow,
+          format: InputImageFormat.nv21,
+          bytesPerRow: image.width, // NV21 has no padding after conversion
         ),
       );
 
@@ -596,34 +636,43 @@ class _CameraScreenState extends State<CameraScreen>
               future: _initializeControllerFuture,
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.done) {
-                  return SizedBox(
-                    width: MediaQuery.of(context).size.width,
-                    height: MediaQuery.of(context).size.height,
-                    child: Stack(
-                      fit: StackFit.expand,
-                      children: [
-                        CameraPreview(_controller),
-                        if (_currentPose != null)
-                          CustomPaint(
-                            size: Size(
-                              MediaQuery.of(context).size.width,
-                              MediaQuery.of(context).size.height,
-                            ),
-                            painter: UnifiedPosePainter(
-                              pose: _currentPose!,
-                              imageSize: Size(
-                                _controller.value.previewSize!.height,
-                                _controller.value.previewSize!.width,
+                  // Calculate scale to make camera preview fill screen
+                  final screenSize = MediaQuery.of(context).size;
+                  final previewSize = _controller.value.previewSize!;
+                  // Camera preview size is rotated (width/height swapped)
+                  final cameraAspect = previewSize.height / previewSize.width;
+                  final screenAspect = screenSize.width / screenSize.height;
+                  // Scale to fill: use larger of the two ratios
+                  final scale = cameraAspect > screenAspect
+                      ? screenSize.height / (screenSize.width / cameraAspect)
+                      : screenSize.width / (screenSize.height * cameraAspect);
+
+                  return Transform.scale(
+                    scale: scale > 1.0 ? scale : 1.0,
+                    child: SizedBox(
+                      width: screenSize.width,
+                      height: screenSize.height,
+                      child: Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          CameraPreview(_controller),
+                          if (_currentPose != null)
+                            CustomPaint(
+                              size: Size(screenSize.width, screenSize.height),
+                              painter: UnifiedPosePainter(
+                                pose: _currentPose!,
+                                imageSize: Size(
+                                  previewSize.height,
+                                  previewSize.width,
+                                ),
+                                screenSize: screenSize,
+                                cameraLensDirection:
+                                    _currentCamera.lensDirection,
+                                themeColor: themeColor,
                               ),
-                              screenSize: Size(
-                                MediaQuery.of(context).size.width,
-                                MediaQuery.of(context).size.height,
-                              ),
-                              cameraLensDirection: _currentCamera.lensDirection,
-                              themeColor: themeColor,
                             ),
-                          ),
-                      ],
+                        ],
+                      ),
                     ),
                   );
                 } else {

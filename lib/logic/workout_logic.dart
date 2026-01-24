@@ -1,74 +1,70 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 import 'dart:math' as math;
 
 /// Abstract base class for all workout detection logic.
-/// Each exercise type implements its own detection algorithm.
 abstract class WorkoutLogic {
-  /// Process a pose frame and update internal state
   void process(Pose pose);
-
-  /// Current feedback message to display to user
   String get feedback;
-
-  /// Current rep count
   int get repCount;
-
-  /// Current rep quality (0.0 to 1.0)
   double get repQuality;
-
-  /// Whether user is in proper form
   bool get isProperForm;
-
-  /// Exercise name for display
   String get exerciseName;
-
-  /// Theme color for UI
   Color get themeColor;
-
-  /// Icon for UI
   IconData get icon;
-
-  /// Reset all state to initial values
   void reset();
 
-  /// Helper to calculate angle between three landmarks
+  /// Calculates the angle between three landmarks: A -> B -> C
+  /// Uses the robust vector dot product method
   static double calculateAngle(PoseLandmark a, PoseLandmark b, PoseLandmark c) {
+    // Vector from B to A
     double dx1 = a.x - b.x;
     double dy1 = a.y - b.y;
+    // Vector from B to C
     double dx2 = c.x - b.x;
     double dy2 = c.y - b.y;
 
-    double angle =
-        (180 / math.pi) *
-        math.acos(
-          (dx1 * dx2 + dy1 * dy2) /
-              (math.sqrt((dx1 * dx1 + dy1 * dy1) * (dx2 * dx2 + dy2 * dy2))),
-        );
+    // Use dot product formula: cos(angle) = (v1 · v2) / (|v1| * |v2|)
+    double dotProduct = dx1 * dx2 + dy1 * dy2;
+    double magnitude1 = math.sqrt(dx1 * dx1 + dy1 * dy1);
+    double magnitude2 = math.sqrt(dx2 * dx2 + dy2 * dy2);
+
+    if (magnitude1 == 0 || magnitude2 == 0) return 0;
+
+    double cosAngle = dotProduct / (magnitude1 * magnitude2);
+    // Clamp to prevent NaN from floating point errors
+    cosAngle = cosAngle.clamp(-1.0, 1.0);
+
+    double angle = math.acos(cosAngle) * (180 / math.pi);
     return angle.isNaN ? 0 : angle;
   }
 }
 
 /// Push-Up detection logic based on Python PushUpCounter.py algorithm.
-/// Angles: elbow (11,13,15), shoulder (13,11,23), hip (11,23,25)
+/// Key Landmarks:
+/// 11(Left Shoulder), 13(Left Elbow), 15(Left Wrist) -> Elbow Angle
+/// 11(Left Shoulder), 23(Left Hip), 25(Left Knee) -> Hip/Body Alignment
 class PushUpLogic extends WorkoutLogic {
   int _repCount = 0;
   String _feedback = 'Get in plank position...';
   bool _isProperForm = false;
   double _repQuality = 0.0;
 
-  // Push-up state machine
-  int _direction = 0; // 0 = ready for down, 1 = ready for up
-  int _form = 0; // 0 = form not validated, 1 = form OK
+  // State Machine
+  // 0 = Up/Start (Elbow > 160)
+  // 1 = Going Down
+  // 2 = Bottom (Elbow < 90)
+  int _direction = 0;
 
   @override
   String get exerciseName => 'Push-Up';
 
   @override
-  Color get themeColor => const Color(0xFFFF5722); // Orange
+  Color get themeColor => const Color(0xFFFF5722); // Deep Orange
 
   @override
-  IconData get icon => Icons.accessibility_new;
+  IconData get icon => Icons.fitness_center;
 
   @override
   String get feedback => _feedback;
@@ -89,91 +85,119 @@ class PushUpLogic extends WorkoutLogic {
     _isProperForm = false;
     _repQuality = 0.0;
     _direction = 0;
-    _form = 0;
   }
 
   @override
   void process(Pose pose) {
+    // We primarily use the LEFT side for standard side-view detection
     final leftShoulder = pose.landmarks[PoseLandmarkType.leftShoulder];
     final leftElbow = pose.landmarks[PoseLandmarkType.leftElbow];
     final leftWrist = pose.landmarks[PoseLandmarkType.leftWrist];
     final leftHip = pose.landmarks[PoseLandmarkType.leftHip];
     final leftKnee = pose.landmarks[PoseLandmarkType.leftKnee];
 
+    // Safety Check: Ensure all points are visible
     if (leftShoulder == null ||
         leftElbow == null ||
         leftWrist == null ||
         leftHip == null ||
-        leftKnee == null) {
+        leftKnee == null ||
+        leftShoulder.likelihood < 0.5 ||
+        leftElbow.likelihood < 0.5) {
       _feedback = 'Position full body in frame';
       return;
     }
 
-    // Calculate angles matching Python code
+    // 1. Calculate Angles
+    // Elbow Angle (Arm straightness)
     double elbowAngle = WorkoutLogic.calculateAngle(
       leftShoulder,
       leftElbow,
       leftWrist,
     );
-    double shoulderAngle = WorkoutLogic.calculateAngle(
-      leftElbow,
-      leftShoulder,
-      leftHip,
-    );
+
+    // Hip Angle (Body straightness) - Important for form
     double hipAngle = WorkoutLogic.calculateAngle(
       leftShoulder,
       leftHip,
       leftKnee,
     );
 
-    // Calculate quality based on hip alignment
-    _repQuality = (hipAngle > 140) ? 0.8 : (hipAngle / 180.0).clamp(0.0, 1.0);
+    // Debug: Log angles periodically (only in debug mode)
+    assert(() {
+      // This runs only in debug mode
+      if (_repCount % 5 == 0 || _direction == 1) {
+        debugPrint(
+          '💪 Elbow: ${elbowAngle.toStringAsFixed(0)}° | Hip: ${hipAngle.toStringAsFixed(0)}° | Reps: $_repCount',
+        );
+      }
+      return true;
+    }());
 
-    // Check for proper starting form: elbow > 160, shoulder > 40, hip > 160
-    if (elbowAngle > 160 && shoulderAngle > 40 && hipAngle > 160) {
-      _form = 1;
+    // 2. Assess Form Quality (0.0 to 1.0)
+    // Good form means body is straight (hip angle close to 180)
+    // If hip drops or pikes (angle < 150), quality drops
+    double bodyStraightness = (hipAngle / 180.0);
+    if (hipAngle < 150) {
+      _isProperForm = false;
+      _feedback = "Keep body straight!";
+      _repQuality = bodyStraightness * 0.5; // Penalize bad form
+    } else {
+      _isProperForm = true;
+      _repQuality = bodyStraightness;
     }
 
-    if (_form == 1) {
-      // DOWN position: elbow <= 90 AND hip > 160 (body straight)
-      if (elbowAngle <= 90 && hipAngle > 160) {
-        _feedback = 'Push Up!';
-        _isProperForm = true;
-        if (_direction == 0) {
-          _repCount++;
-          _direction = 1;
-          debugPrint('💪 Push-up count: $_repCount');
-        }
+    // 3. Rep Counting Logic (State Machine)
+    // Thresholds from your Python script:
+    // UP: Elbow > 160
+    // DOWN: Elbow < 90
+
+    // Going DOWN
+    if (elbowAngle <= 90) {
+      if (_direction == 0) {
+        // Successful rep completion from top to bottom?
+        // No, typically we count when they come back UP.
+        // But we mark "bottom reached" here.
+        _direction = 1; // 1 means we hit bottom
+        _feedback = "Push Up!";
       }
-      // UP position: elbow > 160, shoulder > 40, hip > 160
-      else if (elbowAngle > 160 && shoulderAngle > 40 && hipAngle > 160) {
-        _feedback = 'Go Down!';
-        _isProperForm = true;
-        if (_direction == 1) {
-          _direction = 0;
-        }
+    }
+
+    // Going UP (Back to start)
+    if (elbowAngle >= 160) {
+      if (_direction == 1) {
+        // We were at bottom, now we are at top -> Count it!
+        _repCount++;
+        _direction = 0; // Reset state
+        _feedback = "Good rep!";
       } else {
-        _feedback = 'Fix Form - Keep body straight';
-        _isProperForm = false;
+        if (_isProperForm) {
+          _feedback = "Go Down";
+        }
       }
-    } else {
-      _feedback = 'Get in plank position';
-      _isProperForm = false;
+    }
+
+    // Intermediate feedback
+    if (_direction == 0 && elbowAngle < 160 && elbowAngle > 90) {
+      _feedback = "Lower...";
+    } else if (_direction == 1 && elbowAngle > 90 && elbowAngle < 160) {
+      _feedback = "Push...";
     }
   }
 }
 
-/// Sit-Up detection logic based on Python situp_realtime.py algorithm.
-/// Angle: shoulder(11) -> hip(23) -> knee(25)
-/// DOWN: angle >= 117, UP: angle <= 89
+/// Sit-Up detection logic based on Python situp_realtime.py.
+/// Key Landmarks: 11(Shoulder), 23(Hip), 25(Knee)
 class SitUpLogic extends WorkoutLogic {
   int _repCount = 0;
-  String _feedback = 'Lie down to start...';
+  String _feedback = 'Lie down...';
   bool _isProperForm = false;
   double _repQuality = 0.0;
 
-  // Sit-up state machine
-  String _stage = 'down'; // 'down' or 'up'
+  // State Machine
+  // 0 = Down (Lying flat)
+  // 1 = Up (Sitting up)
+  int _state = 0;
 
   @override
   String get exerciseName => 'Sit-Up';
@@ -182,7 +206,7 @@ class SitUpLogic extends WorkoutLogic {
   Color get themeColor => const Color(0xFF9C27B0); // Purple
 
   @override
-  IconData get icon => Icons.self_improvement;
+  IconData get icon => Icons.accessibility_new;
 
   @override
   String get feedback => _feedback;
@@ -199,10 +223,10 @@ class SitUpLogic extends WorkoutLogic {
   @override
   void reset() {
     _repCount = 0;
-    _feedback = 'Lie down to start...';
+    _feedback = 'Lie down...';
     _isProperForm = false;
     _repQuality = 0.0;
-    _stage = 'down';
+    _state = 0;
   }
 
   @override
@@ -212,52 +236,67 @@ class SitUpLogic extends WorkoutLogic {
     final leftKnee = pose.landmarks[PoseLandmarkType.leftKnee];
 
     if (leftShoulder == null || leftHip == null || leftKnee == null) {
-      _feedback = 'Position body in side view';
+      _feedback = 'Show side view';
       return;
     }
 
-    // Calculate angle: shoulder → hip → knee
+    // Calculate Torso-Leg Angle
     double angle = WorkoutLogic.calculateAngle(leftShoulder, leftHip, leftKnee);
 
-    // Calculate quality based on angle
-    _repQuality = angle < 100 ? 1.0 : ((180 - angle) / 80.0).clamp(0.0, 1.0);
+    // Python Logic Translation:
+    // angle > 117  -> DOWN (Lying)
+    // angle < 55   -> UP (Curled close to knees)
+    // angle < 89   -> Standard UP threshold
 
-    // DOWN state: angle >= 117 (lying flat)
-    if (angle >= 117) {
-      _stage = 'down';
-      _feedback = 'Sit Up!';
-      _isProperForm = true;
+    // Quality metric: How close to vertical/knees did they get?
+    // Max compression is ~40 degrees. Flat is ~180.
+    if (angle < 90) {
+      _repQuality = (90 - angle) / 50.0; // Higher score for tighter curl
+      if (_repQuality > 1.0) _repQuality = 1.0;
+    } else {
+      _repQuality = 0.5;
     }
 
-    // UP state: angle <= 89 AND was in down position
-    if (angle <= 89 && _stage == 'down') {
-      _stage = 'up';
-      _repCount++;
-      _feedback = 'Great! Go back down';
+    // State Machine
+    if (angle > 117) {
+      // User is lying down
+      if (_state == 1) {
+        // They just finished a rep
+        _feedback = "Go Up!";
+      } else {
+        _feedback = "Ready";
+      }
+      _state = 0; // Reset to down state
       _isProperForm = true;
-      debugPrint('💪 Sit-up count: $_repCount');
-    } else if (angle > 89 && angle < 117) {
-      _feedback = _stage == 'down' ? 'Keep going up!' : 'Go back down';
-      _isProperForm = false;
+    } else if (angle < 80) {
+      // Using 80 as a robust "UP" threshold (python used 89/55)
+      // User is sitting up
+      if (_state == 0) {
+        _repCount++;
+        _state = 1; // Mark as Up
+        _feedback = "Good! Down";
+      }
+      _isProperForm = true;
+    } else {
+      // In motion
+      if (_state == 0)
+        _feedback = "Up...";
+      else
+        _feedback = "Down...";
     }
   }
 }
 
 /// Pull-Up detection logic.
-/// Uses arm angles and wrist-to-shoulder position.
+/// Key Landmarks: Shoulders, Elbows, Wrists
 class PullUpLogic extends WorkoutLogic {
   int _repCount = 0;
-  String _feedback = 'Detecting pose...';
+  String _feedback = 'Hang from bar...';
   bool _isProperForm = false;
   double _repQuality = 0.0;
 
-  // Pull-up state
-  bool _isInUpPosition = false;
-  DateTime? _lastRepTime;
-  static const Duration _minRepDuration = Duration(milliseconds: 1500);
-  static const double _minArmAngle = 60.0;
-  static const double _maxShoulderDiff = 0.1;
-  static const double _minConfidence = 0.7;
+  // State: 0 = Down (Arms straight), 1 = Up (Chin over bar)
+  int _state = 0;
 
   @override
   String get exerciseName => 'Pull-Up';
@@ -266,7 +305,7 @@ class PullUpLogic extends WorkoutLogic {
   Color get themeColor => const Color(0xFF2196F3); // Blue
 
   @override
-  IconData get icon => Icons.fitness_center;
+  IconData get icon => Icons.arrow_upward;
 
   @override
   String get feedback => _feedback;
@@ -283,18 +322,19 @@ class PullUpLogic extends WorkoutLogic {
   @override
   void reset() {
     _repCount = 0;
-    _feedback = 'Detecting pose...';
+    _feedback = 'Hang from bar...';
     _isProperForm = false;
     _repQuality = 0.0;
-    _isInUpPosition = false;
-    _lastRepTime = null;
+    _state = 0;
   }
 
   @override
   void process(Pose pose) {
+    // We check both arms for pullups
     final leftShoulder = pose.landmarks[PoseLandmarkType.leftShoulder];
     final leftElbow = pose.landmarks[PoseLandmarkType.leftElbow];
     final leftWrist = pose.landmarks[PoseLandmarkType.leftWrist];
+
     final rightShoulder = pose.landmarks[PoseLandmarkType.rightShoulder];
     final rightElbow = pose.landmarks[PoseLandmarkType.rightElbow];
     final rightWrist = pose.landmarks[PoseLandmarkType.rightWrist];
@@ -305,109 +345,73 @@ class PullUpLogic extends WorkoutLogic {
         rightShoulder == null ||
         rightElbow == null ||
         rightWrist == null) {
-      _feedback = 'Position full body in frame';
+      _feedback = 'Full upper body needed';
       return;
     }
 
-    // Calculate arm angles
-    double leftAngle = WorkoutLogic.calculateAngle(
+    // Calculate Angles
+    double leftArmAngle = WorkoutLogic.calculateAngle(
       leftShoulder,
       leftElbow,
       leftWrist,
     );
-    double rightAngle = WorkoutLogic.calculateAngle(
+    double rightArmAngle = WorkoutLogic.calculateAngle(
       rightShoulder,
       rightElbow,
       rightWrist,
     );
 
-    // Check form criteria
-    bool properArmAngles = leftAngle < 60 && rightAngle < 60;
-    bool properHeight =
-        (leftWrist.y <= leftShoulder.y && rightWrist.y <= rightShoulder.y);
-    bool stablePosition = (leftShoulder.y - rightShoulder.y).abs() < 0.1;
-    bool highConfidence =
-        leftShoulder.likelihood > 0.7 &&
-        rightShoulder.likelihood > 0.7 &&
-        leftElbow.likelihood > 0.7 &&
-        rightElbow.likelihood > 0.7 &&
-        leftWrist.likelihood > 0.7 &&
-        rightWrist.likelihood > 0.7;
+    double avgArmAngle = (leftArmAngle + rightArmAngle) / 2;
 
-    _isProperForm =
-        properArmAngles && properHeight && stablePosition && highConfidence;
+    // Logic:
+    // DOWN: Arms straight (Angle > 150)
+    // UP: Arms bent (Angle < 70) AND Chin likely above bar (Wrist close to Shoulder Y)
 
-    // Calculate quality
-    double shoulderStability =
-        1.0 -
-        (math.min((leftShoulder.y - rightShoulder.y).abs(), _maxShoulderDiff) /
-            _maxShoulderDiff);
-    double leftHeight = math.max(0, (leftShoulder.y - leftWrist.y));
-    double rightHeight = math.max(0, (rightShoulder.y - rightWrist.y));
-    double heightQuality = (leftHeight + rightHeight) / 2.0;
-    double angleQuality =
-        1.0 - (math.min(leftAngle, rightAngle) / _minArmAngle);
-    double confidenceQuality =
-        math.min(
-          math.min(leftShoulder.likelihood, rightShoulder.likelihood),
-          math.min(
-            math.min(leftElbow.likelihood, rightElbow.likelihood),
-            math.min(leftWrist.likelihood, rightWrist.likelihood),
-          ),
-        ) /
-        _minConfidence;
-
-    _repQuality =
-        (shoulderStability * 0.3 +
-                heightQuality * 0.3 +
-                angleQuality * 0.2 +
-                confidenceQuality * 0.2)
-            .clamp(0.0, 1.0);
-
-    // Update feedback
-    if (!_isProperForm) {
-      if (_repQuality < 0.3) {
-        _feedback = "Keep your shoulders level and face forward";
-      } else if (_repQuality < 0.6) {
-        _feedback = "Pull up higher, chin over the bar";
-      } else {
-        _feedback = "Almost there! Keep going";
-      }
-    } else {
-      _feedback = "Great form!";
+    // Quality: How high did they pull? (Lower angle = higher pull)
+    if (avgArmAngle < 90) {
+      _repQuality = (90 - avgArmAngle) / 40.0;
+      if (_repQuality > 1.0) _repQuality = 1.0;
     }
 
-    // Count reps
-    if (_isProperForm && !_isInUpPosition) {
-      final now = DateTime.now();
-      if (_lastRepTime == null ||
-          now.difference(_lastRepTime!) >= _minRepDuration) {
-        _isInUpPosition = true;
-        _repCount++;
-        _lastRepTime = now;
-        debugPrint('💪 Pull-up count: $_repCount');
+    // State Machine
+    if (avgArmAngle > 150) {
+      // Arms fully extended
+      if (_state == 1) {
+        _feedback = "Pull Up!";
+      } else {
+        _feedback = "Ready";
       }
-    } else if (!_isProperForm && _isInUpPosition) {
-      _isInUpPosition = false;
+      _state = 0; // Down state
+      _isProperForm = true;
+    } else if (avgArmAngle < 70) {
+      // Arms flexed (Top position)
+      if (_state == 0) {
+        _repCount++;
+        _state = 1; // Up state
+        _feedback = "Good! Lower";
+      }
+      _isProperForm = true;
+    } else {
+      // Motion
+      if (_state == 0)
+        _feedback = "Higher...";
+      else
+        _feedback = "Lower...";
     }
   }
 }
 
-/// Factory to create the appropriate WorkoutLogic based on exercise type
 class WorkoutLogicFactory {
   static WorkoutLogic create(String exerciseType) {
     switch (exerciseType.toLowerCase()) {
       case 'push-up':
       case 'pushup':
-      case 'push up':
         return PushUpLogic();
       case 'sit-up':
       case 'situp':
-      case 'sit up':
         return SitUpLogic();
       case 'pull-up':
       case 'pullup':
-      case 'pull up':
       default:
         return PullUpLogic();
     }
