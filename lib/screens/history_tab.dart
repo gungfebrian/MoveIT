@@ -5,7 +5,8 @@ import '../theme/app_theme.dart';
 import 'session_detail_screen.dart';
 
 class HistoryTab extends StatelessWidget {
-  final Color primaryBlue = AppTheme.primary;
+  // Use orange theme for consistency with rest of app
+  static const Color primaryOrange = Color(0xFFFF5C00);
   final Color darkBg = AppTheme.background;
   final Color cardBg = AppTheme.card;
 
@@ -91,7 +92,7 @@ class HistoryTab extends StatelessWidget {
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: Center(
-                        child: CircularProgressIndicator(color: primaryBlue),
+                        child: CircularProgressIndicator(color: primaryOrange),
                       ),
                     );
                   }
@@ -189,7 +190,7 @@ class HistoryTab extends StatelessWidget {
                 builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.waiting) {
                     return Center(
-                      child: CircularProgressIndicator(color: primaryBlue),
+                      child: CircularProgressIndicator(color: primaryOrange),
                     );
                   }
 
@@ -283,7 +284,7 @@ class HistoryTab extends StatelessWidget {
     return Expanded(
       child: Column(
         children: [
-          Icon(icon, color: primaryBlue, size: 28),
+          Icon(icon, color: primaryOrange, size: 28),
           const SizedBox(height: 12),
           Text(
             value,
@@ -333,7 +334,7 @@ class HistoryTab extends StatelessWidget {
         color: cardBg,
         borderRadius: BorderRadius.circular(16),
         border: isLatest
-            ? Border.all(color: primaryBlue.withOpacity(0.5), width: 2)
+            ? Border.all(color: primaryOrange.withOpacity(0.5), width: 2)
             : null,
       ),
       child: Row(
@@ -388,7 +389,7 @@ class HistoryTab extends StatelessWidget {
                           vertical: 2,
                         ),
                         decoration: BoxDecoration(
-                          color: primaryBlue,
+                          color: primaryOrange,
                           borderRadius: BorderRadius.circular(4),
                         ),
                         child: const Text(
@@ -441,7 +442,7 @@ class HistoryTab extends StatelessWidget {
         color: cardBg,
         borderRadius: BorderRadius.circular(16),
         border: isLatest
-            ? Border.all(color: primaryBlue.withOpacity(0.5), width: 2)
+            ? Border.all(color: primaryOrange.withOpacity(0.5), width: 2)
             : null,
       ),
       child: Row(
@@ -449,12 +450,12 @@ class HistoryTab extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: primaryBlue.withOpacity(0.15),
+              color: primaryOrange.withOpacity(0.15),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Icon(
               Icons.fitness_center_rounded,
-              color: primaryBlue,
+              color: primaryOrange,
               size: 24,
             ),
           ),
@@ -484,7 +485,7 @@ class HistoryTab extends StatelessWidget {
                           vertical: 4,
                         ),
                         decoration: BoxDecoration(
-                          color: primaryBlue,
+                          color: primaryOrange,
                           borderRadius: BorderRadius.circular(6),
                         ),
                         child: const Text(

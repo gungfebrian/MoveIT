@@ -52,6 +52,7 @@ dependencies:
 
   # Audio Feedback
   flutter_tts: ^4.0.2
+  wakelock_plus: ^1.4.0
 
 dev_dependencies:
   flutter_test:

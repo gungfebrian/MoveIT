@@ -4,6 +4,7 @@ import 'package:camera/camera.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
+import 'package:wakelock_plus/wakelock_plus.dart';
 import '../services/settings_service.dart';
 import '../services/audio_feedback_service.dart';
 import '../logic/workout_logic.dart';
@@ -29,7 +30,21 @@ class CameraScreen extends StatefulWidget {
 }
 
 /// Unified Pose Painter that uses WorkoutLogic theme colors.
+/// Performance optimized: static paints to avoid GC pressure.
 class UnifiedPosePainter extends CustomPainter {
+  // Static paints to avoid creating new objects every frame (GC optimization)
+  static final Paint _linePaint = Paint()
+    ..strokeWidth = 5.0
+    ..strokeCap = StrokeCap.round;
+
+  static final Paint _glowPaint = Paint()
+    ..strokeWidth = 14.0
+    ..strokeCap = StrokeCap.round;
+
+  static final Paint _pointOuterPaint = Paint();
+  static final Paint _pointInnerPaint = Paint();
+  static final Paint _pointCenterPaint = Paint()..color = Colors.white;
+
   final Pose pose;
   final Size imageSize;
   final Size screenSize;
@@ -66,36 +81,29 @@ class UnifiedPosePainter extends CustomPainter {
       final startOffset = Offset(translateX(start.x), translateY(start.y));
       final endOffset = Offset(translateX(end.x), translateY(end.y));
 
-      // Outer glow
-      canvas.drawLine(
-        startOffset,
-        endOffset,
-        Paint()
-          ..color = color.withAlpha(60)
-          ..strokeWidth = 14.0
-          ..strokeCap = StrokeCap.round,
-      );
+      // Outer glow - reuse static paint, just change color
+      _glowPaint.color = color.withAlpha(60);
+      canvas.drawLine(startOffset, endOffset, _glowPaint);
+
       // Main line
-      canvas.drawLine(
-        startOffset,
-        endOffset,
-        Paint()
-          ..color = color
-          ..strokeWidth = 5.0
-          ..strokeCap = StrokeCap.round,
-      );
+      _linePaint.color = color;
+      canvas.drawLine(startOffset, endOffset, _linePaint);
     }
 
     void drawPoint(PoseLandmark? landmark, Color color) {
       if (landmark == null) return;
       final offset = Offset(translateX(landmark.x), translateY(landmark.y));
 
-      // Outer glow
-      canvas.drawCircle(offset, 16, Paint()..color = color.withAlpha(50));
+      // Outer glow - reuse static paint
+      _pointOuterPaint.color = color.withAlpha(50);
+      canvas.drawCircle(offset, 16, _pointOuterPaint);
+
       // Inner circle
-      canvas.drawCircle(offset, 10, Paint()..color = color);
+      _pointInnerPaint.color = color;
+      canvas.drawCircle(offset, 10, _pointInnerPaint);
+
       // Center white dot
-      canvas.drawCircle(offset, 4, Paint()..color = Colors.white);
+      canvas.drawCircle(offset, 4, _pointCenterPaint);
     }
 
     final landmarks = pose.landmarks;
@@ -227,6 +235,9 @@ class _CameraScreenState extends State<CameraScreen>
   @override
   void initState() {
     super.initState();
+    // Keep screen on during workout
+    WakelockPlus.enable();
+
     // Register lifecycle observer for handling app minimize/resume
     WidgetsBinding.instance.addObserver(this);
 
@@ -247,6 +258,9 @@ class _CameraScreenState extends State<CameraScreen>
   @override
   void dispose() {
     debugPrint('🛑 Disposing camera for ${_workoutLogic.exerciseName}');
+
+    // Allow screen to sleep again
+    WakelockPlus.disable();
 
     // Remove lifecycle observer
     WidgetsBinding.instance.removeObserver(this);
@@ -326,7 +340,7 @@ class _CameraScreenState extends State<CameraScreen>
 
     _controller = CameraController(
       _currentCamera,
-      ResolutionPreset.low, // Use low resolution to reduce memory pressure
+      ResolutionPreset.medium, // Use low resolution to reduce memory pressure
       enableAudio: false,
       imageFormatGroup: ImageFormatGroup.yuv420,
     );
@@ -365,7 +379,7 @@ class _CameraScreenState extends State<CameraScreen>
 
     _controller = CameraController(
       _currentCamera,
-      ResolutionPreset.low,
+      ResolutionPreset.medium,
       enableAudio: false,
       imageFormatGroup: ImageFormatGroup.yuv420,
     );

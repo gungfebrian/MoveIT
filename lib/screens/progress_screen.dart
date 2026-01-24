@@ -634,7 +634,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
     }
   }
 
-  Widget _buildLoginPrompt() {
+  Widget _buildLoginPrompt(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
