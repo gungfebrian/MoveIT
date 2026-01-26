@@ -1,6 +1,6 @@
-# MoveIt 🏋️
+# MoveIt 
 
-AI-powered fitness tracking app with real-time pose detection for counting exercises like pull-ups and push-ups.
+AI-powered fitness tracking app with real-time pose detection for counting exercises like pull ups and push ups.
 
 ## Features
 
@@ -30,7 +30,7 @@ AI-powered fitness tracking app with real-time pose detection for counting exerc
 
 1. Clone the repository
 ```bash
-git clone https://github.com/yourusername/MoveIt.git
+git clone https://github.com/gungfebrian/MoveIt.git
 cd MoveIt
 ```
 
@@ -52,7 +52,7 @@ flutter run
 
 ```
 lib/
-├── Detection/       # Exercise detection algorithms
+├── Detection/       # Exercise detection algorithms (just python code tho)
 ├── screens/         # App screens (Home, Camera, Workouts)
 ├── services/        # Business logic (Auth, Streak, Goals)
 ├── widgets/         # Reusable UI components
