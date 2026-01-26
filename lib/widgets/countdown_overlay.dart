@@ -12,7 +12,7 @@ class CountdownOverlay extends StatefulWidget {
     super.key,
     required this.onComplete,
     this.seconds = 3,
-    this.themeColor = const Color(0xFFFF5C00),
+    this.themeColor = const Color(0xFFF97316),
   });
 
   @override

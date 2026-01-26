@@ -580,6 +580,27 @@ class _CameraScreenState extends State<CameraScreen>
       final durationMs = DateTime.now()
           .difference(_sessionStart)
           .inMilliseconds;
+      final durationMinutes = (durationMs / 60000).round();
+
+      // Estimate calories based on exercise type and reps
+      // Average calories per rep: push-ups ~0.5, sit-ups ~0.3, pull-ups ~1.0
+      final reps = _workoutLogic.repCount;
+      int calories;
+      switch (widget.exerciseType.toLowerCase()) {
+        case 'pull-up':
+          calories = (reps * 1.0).round();
+          break;
+        case 'push-up':
+          calories = (reps * 0.5).round();
+          break;
+        case 'sit-up':
+          calories = (reps * 0.3).round();
+          break;
+        default:
+          calories = (reps * 0.5).round();
+      }
+      // Add base calories for workout duration (3 cal/min for exercise)
+      calories += durationMinutes * 3;
 
       await FirebaseFirestore.instance
           .collection('users')
@@ -590,6 +611,8 @@ class _CameraScreenState extends State<CameraScreen>
             'repCount': _workoutLogic.repCount,
             'timestamp': Timestamp.now(),
             'durationMs': durationMs,
+            'durationMinutes': durationMinutes,
+            'calories': calories,
           });
 
       if (mounted) {

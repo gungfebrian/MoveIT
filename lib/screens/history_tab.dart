@@ -2,15 +2,21 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../theme/app_theme.dart';
+
 import 'session_detail_screen.dart';
 
-class HistoryTab extends StatelessWidget {
-  // Use orange theme for consistency with rest of app
-  static const Color primaryOrange = Color(0xFFFF5C00);
+class HistoryTab extends StatefulWidget {
+  const HistoryTab({super.key});
+
+  @override
+  State<HistoryTab> createState() => _HistoryTabState();
+}
+
+class _HistoryTabState extends State<HistoryTab> {
+  // Use AppTheme for consistency
+  static Color get primaryOrange => AppTheme.primary;
   final Color darkBg = AppTheme.background;
   final Color cardBg = AppTheme.card;
-
-  const HistoryTab({super.key});
 
   // Fetch user statistics from Firestore
   Future<Map<String, int>> _fetchUserStats(String userId) async {
@@ -30,6 +36,9 @@ class HistoryTab extends StatelessWidget {
         totalCalories += (data['calories'] as int?) ?? 0;
         totalMinutes += (data['durationMinutes'] as int?) ?? 0;
       }
+
+      // STRICT ACCURACY: No estimations.
+      // If data is 0, it stays 0.
 
       return {
         'totalCalories': totalCalories,
@@ -77,26 +86,27 @@ class HistoryTab extends StatelessWidget {
       child: SafeArea(
         child: Column(
           children: [
-            // Statistics Card
+            // Custom Header
             Padding(
-              padding: const EdgeInsets.all(24),
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+              child: Center(
+                child: Text(
+                  'History',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ),
+
+            // Stats Summary Card
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
               child: FutureBuilder<Map<String, int>>(
                 future: _fetchUserStats(user.uid),
                 builder: (context, statsSnapshot) {
-                  if (statsSnapshot.connectionState ==
-                      ConnectionState.waiting) {
-                    return Container(
-                      padding: const EdgeInsets.all(32),
-                      decoration: BoxDecoration(
-                        color: cardBg,
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Center(
-                        child: CircularProgressIndicator(color: primaryOrange),
-                      ),
-                    );
-                  }
-
                   final stats =
                       statsSnapshot.data ??
                       {
@@ -108,51 +118,30 @@ class HistoryTab extends StatelessWidget {
                   return Container(
                     padding: const EdgeInsets.all(24),
                     decoration: BoxDecoration(
-                      color: cardBg,
-                      borderRadius: BorderRadius.circular(20),
+                      gradient: LinearGradient(
+                        colors: [cardBg, cardBg.withOpacity(0.8)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(24),
+                      border: Border.all(color: Colors.white.withOpacity(0.05)),
                     ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Text(
-                          'Your Stats',
-                          style: TextStyle(
-                            fontSize: 22,
-                            fontWeight: FontWeight.w700,
-                            color: Colors.white,
-                          ),
+                        _buildStatItem('${stats['totalSessions']}', 'Workouts'),
+                        Container(
+                          width: 1,
+                          height: 40,
+                          color: Colors.white.withOpacity(0.1),
                         ),
-                        const SizedBox(height: 24),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceAround,
-                          children: [
-                            _buildStatColumn(
-                              '${stats['totalSessions']}',
-                              'Total\nWorkouts',
-                              Icons.fitness_center_rounded,
-                            ),
-                            Container(
-                              height: 50,
-                              width: 1,
-                              color: Colors.white.withOpacity(0.1),
-                            ),
-                            _buildStatColumn(
-                              '${stats['totalCalories']}',
-                              'Total\nCalories',
-                              Icons.local_fire_department_rounded,
-                            ),
-                            Container(
-                              height: 50,
-                              width: 1,
-                              color: Colors.white.withOpacity(0.1),
-                            ),
-                            _buildStatColumn(
-                              '${stats['totalMinutes']}',
-                              'Total\nMinutes',
-                              Icons.timer_rounded,
-                            ),
-                          ],
+                        _buildStatItem('${stats['totalMinutes']}', 'Minutes'),
+                        Container(
+                          width: 1,
+                          height: 40,
+                          color: Colors.white.withOpacity(0.1),
                         ),
+                        _buildStatItem('${stats['totalCalories']}', 'Kcal'),
                       ],
                     ),
                   );
@@ -160,24 +149,27 @@ class HistoryTab extends StatelessWidget {
               ),
             ),
 
+            const SizedBox(height: 32),
+
             // Section Title
             Padding(
               padding: const EdgeInsets.fromLTRB(24, 0, 24, 16),
               child: Row(
                 children: [
-                  const Text(
-                    'Recent Sessions',
+                  Text(
+                    'Recent Activity', // Renamed for better feel
                     style: TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.w700,
-                      color: Colors.white,
+                      color: Colors.white.withOpacity(0.9),
+                      letterSpacing: -0.5,
                     ),
                   ),
                 ],
               ),
             ),
 
-            // Simple List of Last Sessions
+            // List of Last Sessions
             Expanded(
               child: StreamBuilder<QuerySnapshot>(
                 stream: FirebaseFirestore.instance
@@ -209,24 +201,15 @@ class HistoryTab extends StatelessWidget {
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Icon(
-                            Icons.fitness_center_outlined,
+                            Icons.history_rounded,
                             size: 64,
-                            color: Colors.white.withOpacity(0.3),
+                            color: Colors.white.withOpacity(0.2),
                           ),
-                          const SizedBox(height: 20),
+                          const SizedBox(height: 16),
                           Text(
-                            'No workouts yet',
+                            'No history yet',
                             style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.white.withOpacity(0.7),
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            'Start your first workout!',
-                            style: TextStyle(
-                              fontSize: 14,
+                              fontSize: 16,
                               color: Colors.white.withOpacity(0.5),
                             ),
                           ),
@@ -235,9 +218,11 @@ class HistoryTab extends StatelessWidget {
                     );
                   }
 
-                  return ListView.builder(
-                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                  return ListView.separated(
+                    padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
                     itemCount: snapshot.data!.docs.length,
+                    separatorBuilder: (context, index) =>
+                        const SizedBox(height: 12),
                     itemBuilder: (context, index) {
                       final doc = snapshot.data!.docs[index];
                       final data = doc.data() as Map<String, dynamic>;
@@ -280,33 +265,29 @@ class HistoryTab extends StatelessWidget {
     );
   }
 
-  Widget _buildStatColumn(String value, String label, IconData icon) {
-    return Expanded(
-      child: Column(
-        children: [
-          Icon(icon, color: primaryOrange, size: 28),
-          const SizedBox(height: 12),
-          Text(
-            value,
-            style: const TextStyle(
-              fontSize: 32,
-              fontWeight: FontWeight.w900,
-              color: Colors.white,
-              letterSpacing: -1,
-            ),
+  Widget _buildStatItem(String value, String label) {
+    return Column(
+      children: [
+        Text(
+          value,
+          style: const TextStyle(
+            fontSize: 24,
+            fontWeight: FontWeight.w700,
+            color: Colors.white,
+            height: 1.0,
           ),
-          const SizedBox(height: 4),
-          Text(
-            label,
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 12,
-              color: Colors.white.withOpacity(0.5),
-              height: 1.3,
-            ),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          label.toUpperCase(),
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+            color: Colors.white.withOpacity(0.5),
+            letterSpacing: 0.5,
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
@@ -314,6 +295,7 @@ class HistoryTab extends StatelessWidget {
     required Map<String, dynamic> data,
     bool isLatest = false,
   }) {
+    // Explicit Naming: Use exact exercise name
     final exerciseName = data['exerciseType'] as String? ?? 'Pull-Ups';
     final repCount =
         data['pullUpCount'] as int? ?? data['pushUpCount'] as int? ?? 0;
@@ -321,29 +303,41 @@ class HistoryTab extends StatelessWidget {
 
     // Determine icon based on exercise type
     IconData exerciseIcon = Icons.fitness_center_rounded;
-    Color exerciseColor = const Color(0xFFFF5C00);
+    Color exerciseColor = const Color(0xFFF97316);
+
+    // Better detection for exercise types
     if (exerciseName.toLowerCase().contains('push')) {
       exerciseIcon = Icons.sports_gymnastics_rounded;
       exerciseColor = const Color(0xFF007AFF);
+    } else if (exerciseName.toLowerCase().contains('squat')) {
+      exerciseIcon = Icons.accessibility_new_rounded;
+      exerciseColor = const Color(0xFF10B981); // Green for legs
     }
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: cardBg,
-        borderRadius: BorderRadius.circular(16),
-        border: isLatest
-            ? Border.all(color: primaryOrange.withOpacity(0.5), width: 2)
-            : null,
+        color: cardBg.withOpacity(0.6), // Slightly lighter/translucent
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: isLatest ? primaryOrange.withOpacity(0.3) : Colors.transparent,
+          width: 1.5,
+        ),
       ),
       child: Row(
         children: [
           Container(
-            padding: const EdgeInsets.all(14),
+            padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: exerciseColor.withOpacity(0.15),
-              borderRadius: BorderRadius.circular(12),
+              gradient: LinearGradient(
+                colors: [
+                  exerciseColor.withOpacity(0.2),
+                  exerciseColor.withOpacity(0.1),
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(16),
             ),
             child: Icon(exerciseIcon, color: exerciseColor, size: 24),
           ),
@@ -354,71 +348,77 @@ class HistoryTab extends StatelessWidget {
               children: [
                 Row(
                   children: [
+                    // Exercise Name with Reps
                     Text(
                       '$repCount $exerciseName',
                       style: const TextStyle(
-                        fontSize: 17,
+                        fontSize: 16,
                         fontWeight: FontWeight.w700,
                         color: Colors.white,
                       ),
                     ),
                     const SizedBox(width: 8),
+                    if (isLatest)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: primaryOrange,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Text(
+                          'NEW',
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w800,
+                            color: Colors.white,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    // Explicit "AI (ExerciseName)" Label
                     Container(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 6,
                         vertical: 2,
                       ),
                       decoration: BoxDecoration(
-                        color: Colors.purple.withOpacity(0.2),
+                        color: Colors.purple.withOpacity(0.15),
                         borderRadius: BorderRadius.circular(4),
                       ),
-                      child: const Text(
-                        'AI',
+                      child: Text(
+                        'AI (${exerciseName})', // Explicit naming
                         style: TextStyle(
                           fontSize: 10,
                           fontWeight: FontWeight.w700,
-                          color: Colors.purple,
+                          color: Colors.purple.shade200,
                         ),
                       ),
                     ),
-                    if (isLatest) ...[
-                      const SizedBox(width: 6),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 6,
-                          vertical: 2,
-                        ),
-                        decoration: BoxDecoration(
-                          color: primaryOrange,
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: const Text(
-                          'Latest',
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w700,
-                            color: Colors.white,
-                          ),
-                        ),
+                    const SizedBox(width: 8),
+                    Text(
+                      timestamp != null ? _formatDate(timestamp) : '',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.white.withOpacity(0.4),
                       ),
-                    ],
+                    ),
                   ],
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  timestamp != null ? _formatDate(timestamp) : 'Unknown date',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.white.withOpacity(0.4),
-                  ),
                 ),
               ],
             ),
           ),
           Icon(
             Icons.chevron_right_rounded,
-            color: Colors.white.withOpacity(0.3),
-            size: 24,
+            color: Colors.white.withOpacity(0.2),
+            size: 20,
           ),
         ],
       ),
@@ -430,28 +430,45 @@ class HistoryTab extends StatelessWidget {
     required Map<String, dynamic> data,
     bool isLatest = false,
   }) {
-    final workoutName = data['workoutTitle'] as String? ?? 'Workout';
+    // Explicit Naming: Prefer Category if Title is 'Workout'
+    String workoutName = data['workoutTitle'] as String? ?? 'Workout';
+    final category = data['category'] as String?;
+
+    // If generic name, try to use category for more accuracy
+    if (workoutName == 'Workout' && category != null && category.isNotEmpty) {
+      workoutName = category; // e.g. "Cardio", "Strength"
+    } else if (workoutName == 'Workout') {
+      workoutName = 'Routine Workout'; // Better than just "Workout"
+    }
+
     final calories = data['calories'] as int? ?? 0;
     final durationMinutes = data['durationMinutes'] as int? ?? 0;
     final timestamp = (data['timestamp'] as Timestamp?)?.toDate();
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: cardBg,
-        borderRadius: BorderRadius.circular(16),
-        border: isLatest
-            ? Border.all(color: primaryOrange.withOpacity(0.5), width: 2)
-            : null,
+        color: cardBg.withOpacity(0.6),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: isLatest ? primaryOrange.withOpacity(0.3) : Colors.transparent,
+          width: 1.5,
+        ),
       ),
       child: Row(
         children: [
           Container(
-            padding: const EdgeInsets.all(14),
+            padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: primaryOrange.withOpacity(0.15),
-              borderRadius: BorderRadius.circular(12),
+              gradient: LinearGradient(
+                colors: [
+                  primaryOrange.withOpacity(0.2),
+                  primaryOrange.withOpacity(0.1),
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(16),
             ),
             child: Icon(
               Icons.fitness_center_rounded,
@@ -486,14 +503,15 @@ class HistoryTab extends StatelessWidget {
                         ),
                         decoration: BoxDecoration(
                           color: primaryOrange,
-                          borderRadius: BorderRadius.circular(6),
+                          borderRadius: BorderRadius.circular(8),
                         ),
                         child: const Text(
-                          'Latest',
+                          'NEW',
                           style: TextStyle(
                             fontSize: 10,
-                            fontWeight: FontWeight.w700,
+                            fontWeight: FontWeight.w800,
                             color: Colors.white,
+                            letterSpacing: 0.5,
                           ),
                         ),
                       ),
@@ -503,41 +521,38 @@ class HistoryTab extends StatelessWidget {
                 const SizedBox(height: 6),
                 Row(
                   children: [
-                    Icon(
-                      Icons.timer_outlined,
-                      size: 14,
-                      color: Colors.white.withOpacity(0.5),
-                    ),
-                    const SizedBox(width: 4),
                     Text(
                       '$durationMinutes min',
                       style: TextStyle(
-                        fontSize: 13,
-                        color: Colors.white.withOpacity(0.5),
+                        fontSize: 12,
+                        color: Colors.white.withOpacity(0.6),
+                        fontWeight: FontWeight.w500,
                       ),
                     ),
-                    const SizedBox(width: 12),
-                    Icon(
-                      Icons.local_fire_department_rounded,
-                      size: 14,
-                      color: Colors.white.withOpacity(0.5),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 6),
+                      child: Icon(
+                        Icons.circle,
+                        size: 4,
+                        color: Colors.white.withOpacity(0.2),
+                      ),
                     ),
-                    const SizedBox(width: 4),
                     Text(
                       '$calories kcal',
                       style: TextStyle(
-                        fontSize: 13,
-                        color: Colors.white.withOpacity(0.5),
+                        fontSize: 12,
+                        color: Colors.white.withOpacity(0.6),
+                        fontWeight: FontWeight.w500,
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 2), // Small gap
                 Text(
-                  timestamp != null ? _formatDate(timestamp) : 'Unknown date',
+                  timestamp != null ? _formatDate(timestamp) : '',
                   style: TextStyle(
                     fontSize: 12,
-                    color: Colors.white.withOpacity(0.4),
+                    color: Colors.white.withOpacity(0.3),
                   ),
                 ),
               ],
@@ -545,8 +560,8 @@ class HistoryTab extends StatelessWidget {
           ),
           Icon(
             Icons.chevron_right_rounded,
-            color: Colors.white.withOpacity(0.3),
-            size: 24,
+            color: Colors.white.withOpacity(0.2),
+            size: 20,
           ),
         ],
       ),

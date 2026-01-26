@@ -17,7 +17,7 @@ class SessionDetailScreen extends StatelessWidget {
   // Premium Dark Theme
   static const Color _bgColor = Color(0xFF08080C);
   static const Color _cardBg = Color(0xFF12121A);
-  static const Color _primaryOrange = Color(0xFFFF5C00);
+  static const Color _primaryOrange = Color(0xFFF97316);
 
   @override
   Widget build(BuildContext context) {

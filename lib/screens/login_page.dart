@@ -20,9 +20,9 @@ class _LoginPageState extends State<LoginPage> {
   static const Color _bgColor = Color(0xFF08080C); // Deeper black
   static const Color _surfaceColor = Color(0xFF12121A);
   static const Color _primaryOrange = Color(
-    0xFFFF5C00,
+    0xFFF97316,
   ); // More vibrant athletic orange
-  static const Color _accentOrange = Color(0xFFFF8A00);
+  static const Color _accentOrange = Color(0xFFFB923C);
   static const Color _textPrimary = Colors.white;
   static const Color _textSecondary = Color(0xFF94949E);
 
@@ -451,7 +451,7 @@ class _LoginBottomSheetState extends State<_LoginBottomSheet> {
               child: ElevatedButton(
                 onPressed: _loading ? null : _handleLogin,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFFF5C00),
+                  backgroundColor: const Color(0xFFF97316),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(18),
                   ),
@@ -479,15 +479,15 @@ class _LoginBottomSheetState extends State<_LoginBottomSheet> {
             // Social Login
             Center(
               child: TextButton.icon(
-                onPressed: () {},
-                icon: const Icon(
-                  Icons.g_mobiledata_rounded,
-                  size: 32,
-                  color: Colors.white,
-                ),
+                onPressed: _loading ? null : _handleGoogleSignIn,
                 label: const Text(
                   'Continue with Google',
                   style: TextStyle(color: Colors.white70),
+                ),
+                icon: Image.asset(
+                  "assets/images/googlee.png",
+                  width: 24,
+                  height: 24,
                 ),
               ),
             ),
@@ -511,7 +511,7 @@ class _LoginBottomSheetState extends State<_LoginBottomSheet> {
       decoration: InputDecoration(
         hintText: hint,
         hintStyle: const TextStyle(color: Colors.white30),
-        prefixIcon: Icon(icon, color: const Color(0xFFFF5C00), size: 20),
+        prefixIcon: Icon(icon, color: const Color(0xFFF97316), size: 20),
         suffixIcon: suffix,
         filled: true,
         fillColor: Colors.white.withOpacity(0.05),
@@ -521,7 +521,7 @@ class _LoginBottomSheetState extends State<_LoginBottomSheet> {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(18),
-          borderSide: const BorderSide(color: Color(0xFFFF5C00), width: 1),
+          borderSide: const BorderSide(color: Color(0xFFF97316), width: 1),
         ),
       ),
     );
@@ -545,6 +545,25 @@ class _LoginBottomSheetState extends State<_LoginBottomSheet> {
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text(error ?? 'Login Failed')));
+      }
+    }
+  }
+
+  void _handleGoogleSignIn() async {
+    setState(() => _loading = true);
+    final error = await widget.authService.signInWithGoogle();
+    if (error == null && mounted) {
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (c) => const HomePage()),
+        (r) => false,
+      );
+    } else {
+      if (mounted) {
+        setState(() => _loading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(error ?? 'Google Sign-In Failed')),
+        );
       }
     }
   }

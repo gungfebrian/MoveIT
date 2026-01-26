@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'dart:ui' as ui;
 
 import '../theme/app_theme.dart';
 
@@ -18,45 +17,19 @@ class LiquidNavBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final Size size = MediaQuery.of(context).size;
-    
+
     return SizedBox(
       height: 100, // Total height including FAB space
       child: Stack(
         alignment: Alignment.bottomCenter,
         children: [
-          // Background Shape with Glass Effect
+          // Solid Background with Shadow and Scoop
           CustomPaint(
             size: Size(size.width, 80),
             painter: LiquidPainter(
-              color: AppTheme.card.withOpacity(0.6), // Glass base color
-              shadowColor: Colors.black.withOpacity(0.3),
+              color: const Color(0xFF1E1E1E), // Solid matte dark grey
+              shadowColor: Colors.black.withOpacity(0.5), // Subtle shadow
             ),
-            child: ClipPath(
-              clipper: LiquidClipper(),
-              child: BackdropFilter(
-                filter: ui.ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-                child: Container(
-                  height: 80,
-                  width: size.width,
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [
-                        AppTheme.card.withOpacity(0.7),
-                        AppTheme.card.withOpacity(0.5),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
-
-          // Glass Border and Highlight (Overlay Painter)
-          CustomPaint(
-            size: Size(size.width, 80),
-            painter: LiquidBorderPainter(),
           ),
 
           // Navigation Items
@@ -85,13 +58,13 @@ class LiquidNavBar extends StatelessWidget {
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   gradient: const LinearGradient(
-                    colors: [Color(0xFFFF6B00), Color(0xFFFF8F00)],
+                    colors: [Color(0xFFF97316), Color(0xFFFB923C)],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: const Color(0xFFFF5C00).withOpacity(0.5),
+                      color: const Color(0xFFF97316).withOpacity(0.5),
                       blurRadius: 20,
                       offset: const Offset(0, 10),
                     ),
@@ -107,7 +80,7 @@ class LiquidNavBar extends StatelessWidget {
                   decoration: const BoxDecoration(
                     shape: BoxShape.circle,
                     gradient: LinearGradient(
-                      colors: [Color(0xFFFF5C00), Color(0xFFFF8A00)],
+                      colors: [Color(0xFFF97316), Color(0xFFFB923C)],
                     ),
                   ),
                   child: const Icon(
@@ -138,7 +111,9 @@ class LiquidNavBar extends StatelessWidget {
             // Icon stays in one place
             Icon(
               icon,
-              color: isSelected ? AppTheme.primary : Colors.white.withOpacity(0.7),
+              color: isSelected
+                  ? AppTheme.primary
+                  : Colors.white.withOpacity(0.7),
               size: 28,
             ),
             const SizedBox(height: 6),
@@ -167,34 +142,37 @@ class LiquidPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final Path path = Path();
-    
+
     // Starting point
     path.moveTo(0, 0);
-    
+
     // Top line with liquid dip
     final double centerX = size.width / 2;
-    final double dipWidth = 80;
-    final double dipDepth = 35; // How deep the curve goes (positive is down for us since we want to cradle the button or up?)
-    // Actually for "Liquid", usually the button floats and the bar curves AWAY or AROUND it.
-    // If we want the button to float "in" a dip:
-    
-    //  ____      ____
-    //      \___/
-    
-    path.lineTo(centerX - dipWidth * 0.8, 0);
-    
-    // The Curve
+    // Smoother, wider curve construction
+    final double dipWidth = 90; // Slightly wider for ease
+    final double dipDepth = 35;
+
+    // Using two cubic curves for a smooth "U" shape instead of sharp "V"
+    path.lineTo(centerX - dipWidth * 0.6, 0);
+
     path.cubicTo(
-      centerX - dipWidth * 0.4, 0,
-      centerX - dipWidth * 0.4, dipDepth,
-      centerX, dipDepth,
+      centerX - dipWidth * 0.3,
+      0, // Control point 1
+      centerX - dipWidth * 0.3,
+      dipDepth, // Control point 2
+      centerX,
+      dipDepth, // End point
     );
+
     path.cubicTo(
-      centerX + dipWidth * 0.4, dipDepth,
-      centerX + dipWidth * 0.4, 0,
-      centerX + dipWidth * 0.8, 0,
+      centerX + dipWidth * 0.3,
+      dipDepth, // Control point 1
+      centerX + dipWidth * 0.3,
+      0, // Control point 2
+      centerX + dipWidth * 0.6,
+      0, // End point
     );
-    
+
     path.lineTo(size.width, 0);
     path.lineTo(size.width, size.height);
     path.lineTo(0, size.height);
@@ -202,89 +180,9 @@ class LiquidPainter extends CustomPainter {
 
     // Shadow
     canvas.drawShadow(path, shadowColor, 10, true);
-    
+
     // Fill
     final Paint paint = Paint()..color = color;
-    canvas.drawPath(path, paint);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}
-
-class LiquidClipper extends CustomClipper<Path> {
-  @override
-  Path getClip(Size size) {
-    final Path path = Path();
-    
-    path.moveTo(0, 0);
-    
-    final double centerX = size.width / 2;
-    final double dipWidth = 80;
-    final double dipDepth = 35;
-    
-    path.lineTo(centerX - dipWidth * 0.8, 0);
-    
-    path.cubicTo(
-      centerX - dipWidth * 0.4, 0,
-      centerX - dipWidth * 0.4, dipDepth,
-      centerX, dipDepth,
-    );
-    path.cubicTo(
-      centerX + dipWidth * 0.4, dipDepth,
-      centerX + dipWidth * 0.4, 0,
-      centerX + dipWidth * 0.8, 0,
-    );
-    
-    path.lineTo(size.width, 0);
-    path.lineTo(size.width, size.height);
-    path.lineTo(0, size.height);
-    path.close();
-    
-    return path;
-  }
-
-  @override
-  bool shouldReclip(covariant CustomClipper<Path> oldClipper) => false;
-}
-
-class LiquidBorderPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final Path path = Path();
-    
-    path.moveTo(0, 0);
-    
-    final double centerX = size.width / 2;
-    final double dipWidth = 80;
-    final double dipDepth = 35;
-    
-    path.lineTo(centerX - dipWidth * 0.8, 0);
-    path.cubicTo(
-      centerX - dipWidth * 0.4, 0,
-      centerX - dipWidth * 0.4, dipDepth,
-      centerX, dipDepth,
-    );
-    path.cubicTo(
-      centerX + dipWidth * 0.4, dipDepth,
-      centerX + dipWidth * 0.4, 0,
-      centerX + dipWidth * 0.8, 0,
-    );
-    path.lineTo(size.width, 0);
-
-    // Gradient Border (Top only generally looks best for glass)
-    final Paint paint = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.5
-      ..shader = LinearGradient(
-        begin: Alignment.topCenter,
-        end: Alignment.bottomCenter,
-        colors: [
-          Colors.white.withOpacity(0.4),
-          Colors.white.withOpacity(0.1),
-        ],
-      ).createShader(Rect.fromLTWH(0, 0, size.width, size.height));
-
     canvas.drawPath(path, paint);
   }
 

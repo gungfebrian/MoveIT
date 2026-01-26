@@ -27,7 +27,7 @@ class _RegisterPageState extends State<RegisterPage> {
   // Premium Palette (Matching Login Page)
   static const Color _bgColor = Color(0xFF08080C);
   static const Color _surfaceColor = Color(0xFF14141C); // Matches Login Modal
-  static const Color _primaryOrange = Color(0xFFFF5C00);
+  static const Color _primaryOrange = Color(0xFFF97316);
   static const Color _textPrimary = Colors.white;
   static const Color _textSecondary = Color(0xFF94949E);
 
@@ -280,7 +280,7 @@ class _RegisterPageState extends State<RegisterPage> {
         ),
         prefixIcon: Icon(
           icon,
-          color: const Color(0xFFFF5C00),
+          color: const Color(0xFFF97316),
           size: Responsive.icon(context, 0.05),
         ),
         suffixIcon: isPass
@@ -300,7 +300,7 @@ class _RegisterPageState extends State<RegisterPage> {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(18),
-          borderSide: const BorderSide(color: Color(0xFFFF5C00), width: 1),
+          borderSide: const BorderSide(color: Color(0xFFF97316), width: 1),
         ),
         contentPadding: EdgeInsets.symmetric(
           horizontal: Responsive.width(context, 0.05),

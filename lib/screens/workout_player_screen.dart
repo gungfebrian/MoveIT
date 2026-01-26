@@ -21,8 +21,8 @@ class _WorkoutPlayerScreenState extends State<WorkoutPlayerScreen>
   // Premium Dark Theme
   static const Color _bgColor = Color(0xFF08080C);
   static const Color _cardBg = Color(0xFF12121A);
-  static const Color _primaryOrange = Color(0xFFFF5C00);
-  static const Color _accentOrange = Color(0xFFFF8A00);
+  static const Color _primaryOrange = Color(0xFFF97316);
+  static const Color _accentOrange = Color(0xFFFB923C);
 
   // State
   int _currentExerciseIndex = 0;
@@ -561,7 +561,7 @@ class _WorkoutPlayerScreenState extends State<WorkoutPlayerScreen>
               Navigator.of(context).pop();
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
+              backgroundColor: _primaryOrange,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
               ),

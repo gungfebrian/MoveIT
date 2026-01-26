@@ -16,20 +16,18 @@ class AppTheme {
   static const Color elevated = Color(0xFF2C2C2E); // Lighter Gray for elevation
   static const Color card = Color(0xFF12121A); // Matches Login Page
 
-  // Brand Accents
+  // Brand Accents - Warm Coral Orange (from reference)
   static const Color primary = Color(
-    0xFFFF5C00,
-  ); // Vibrant Athletic Orange (Matches Login)
-  static const Color primaryLight = Color(
-    0xFFFF8A00,
-  ); // Accent Orange (Matches Login)
-  static const Color primaryDark = Color(0xFFE55A3A);
+    0xFFF97316,
+  ); // Warm Coral Orange (matches reference)
+  static const Color primaryLight = Color(0xFFFB923C); // Lighter Coral Orange
+  static const Color primaryDark = Color(0xFFEA580C); // Darker shade
 
   // Functional Colors
   static const Color secondary = Color(0xFF32ADE6); // Apple Blue
   static const Color success = Color(0xFF30D158); // Apple Green
   static const Color error = Color(0xFFFF453A); // Apple Red
-  static const Color warning = Color(0xFFFF9F0A); // Apple Orange
+  static const Color warning = Color(0xFFF97316); // Now matches primary
 
   // Text Colors
   static const Color textPrimary = Color(0xFFFFFFFF);

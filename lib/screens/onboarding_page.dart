@@ -17,7 +17,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   // Premium Dark Palette
   static const Color _bgColor = Color(0xFF08080C);
   static const Color _surfaceColor = Color(0xFF14141C);
-  static const Color _primaryOrange = Color(0xFFFF5C00);
+  static const Color _primaryOrange = Color(0xFFF97316);
   static const Color _textPrimary = Colors.white;
   static const Color _textSecondary = Color(0xFF94949E);
 

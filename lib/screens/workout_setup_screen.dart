@@ -18,7 +18,7 @@ class WorkoutSetupScreen extends StatefulWidget {
 
 class _WorkoutSetupScreenState extends State<WorkoutSetupScreen> {
   // Premium Colors
-  final Color primaryOrange = const Color(0xFFFF5C00);
+  final Color primaryOrange = const Color(0xFFF97316);
   final Color pDarkBg = const Color(0xFF08080C);
   final Color pCardBg = const Color(0xFF12121A);
 

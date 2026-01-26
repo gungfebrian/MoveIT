@@ -16,10 +16,10 @@ class ProgressScreen extends StatefulWidget {
 }
 
 class _ProgressScreenState extends State<ProgressScreen> {
-  // Premium Dark Theme (Consistent with rest of app)
-  final Color primaryOrange = const Color(0xFFFF5C00);
-  final Color pDarkBg = const Color(0xFF08080C);
-  final Color pCardBg = const Color(0xFF12121A);
+  // Premium Dark Theme - using AppTheme
+  Color get primaryOrange => AppTheme.primary;
+  Color get pDarkBg => AppTheme.background;
+  Color get pCardBg => AppTheme.card;
 
   final StreakService _streakService = StreakService();
   String _selectedPeriod = 'Monthly';
@@ -86,34 +86,16 @@ class _ProgressScreenState extends State<ProgressScreen> {
   Widget _buildHeader(BuildContext context) {
     return Padding(
       padding: EdgeInsets.symmetric(vertical: Responsive.height(context, 0.02)),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          // Back button
-          _buildCircleButton(
-            context: context,
-            icon: Icons.chevron_left_rounded,
-            onTap: () => Navigator.pop(context),
+      child: Center(
+        child: Text(
+          'Progress',
+          style: TextStyle(
+            fontSize: Responsive.text(context, 0.04),
+            fontWeight: FontWeight.w600,
+            fontFamily: 'Inter',
+            color: Colors.white,
           ),
-
-          Text(
-            'Progress',
-            style: TextStyle(
-              fontSize: Responsive.text(context, 0.04),
-              fontWeight: FontWeight.w600,
-              fontFamily: 'Inter',
-              color: Colors.white,
-            ),
-          ),
-
-          // Notification icon
-          _buildCircleButton(
-            context: context,
-            icon: Icons.notifications_none_rounded,
-            onTap: () {},
-            size: Responsive.icon(context, 0.06),
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -146,68 +128,85 @@ class _ProgressScreenState extends State<ProgressScreen> {
         final stats =
             snapshot.data ?? {'workouts': 0, 'minutes': 0, 'calories': 0};
 
-        return Row(
-          children: [
-            Expanded(
-              child: _buildStatCard(
+        // Unified Clean Card (Strict Theme)
+        return Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: pCardBg,
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(
+              color: Colors.white.withOpacity(0.08),
+            ), // Subtle border
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.2),
+                blurRadius: 16,
+                offset: const Offset(0, 8),
+              ),
+            ],
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              _buildUnifiedStatItem(
                 context,
-                'Workouts',
                 '${stats['workouts']}',
+                'Workouts',
               ),
-            ),
-            SizedBox(width: Responsive.width(context, 0.035)),
-            Expanded(
-              child: _buildStatCard(context, 'Minutes', '${stats['minutes']}'),
-            ),
-            SizedBox(width: Responsive.width(context, 0.035)),
-            Expanded(
-              child: _buildStatCard(
-                context,
-                'Calories',
-                '${stats['calories']}',
+              Container(
+                width: 1,
+                height: 40,
+                color: Colors.white.withOpacity(0.1),
               ),
-            ),
-          ],
+              _buildUnifiedStatItem(context, '${stats['minutes']}', 'Minutes'),
+              Container(
+                width: 1,
+                height: 40,
+                color: Colors.white.withOpacity(0.1),
+              ),
+              _buildUnifiedStatItem(context, '${stats['calories']}', 'Kcal'),
+            ],
+          ),
         );
       },
     );
   }
 
-  Widget _buildStatCard(BuildContext context, String label, String value) {
-    return Container(
-      padding: EdgeInsets.symmetric(
-        vertical: Responsive.height(context, 0.025),
-        horizontal: Responsive.width(context, 0.03),
-      ),
-      decoration: BoxDecoration(
-        color: pCardBg,
-        borderRadius: BorderRadius.circular(20),
-      ),
+  Widget _buildUnifiedStatItem(
+    BuildContext context,
+    String value,
+    String label,
+  ) {
+    return Expanded(
       child: Column(
         children: [
           Text(
-            label,
-            style: TextStyle(
-              fontSize: Responsive.text(context, 0.032),
-              fontWeight: FontWeight.w500,
-              fontFamily: 'Inter',
-              color: Colors.white.withOpacity(0.5),
-            ),
-          ),
-          SizedBox(height: Responsive.height(context, 0.01)),
-          Text(
             value,
             style: TextStyle(
-              fontSize: Responsive.text(context, 0.055),
-              fontWeight: FontWeight.w700,
+              fontSize: Responsive.text(context, 0.06),
+              fontWeight: FontWeight.w800,
               fontFamily: 'Inter',
-              color: Colors.white,
+              color: primaryOrange, // Accent color for numbers
+              height: 1.0,
+            ),
+          ),
+          SizedBox(height: 6),
+          Text(
+            label.toUpperCase(),
+            style: TextStyle(
+              fontSize: Responsive.text(context, 0.028),
+              fontWeight: FontWeight.w600,
+              fontFamily: 'Inter',
+              color: Colors.white.withOpacity(0.5),
+              letterSpacing: 0.5,
             ),
           ),
         ],
       ),
     );
   }
+
+  // Old _buildStatCard is removed/replaced by above logic
 
   Widget _buildStreakSection(BuildContext context) {
     return StreamBuilder<Map<String, int>>(
@@ -216,28 +215,43 @@ class _ProgressScreenState extends State<ProgressScreen> {
         final currentStreak = snapshot.data?['currentStreak'] ?? 0;
         final bestStreak = snapshot.data?['bestStreak'] ?? 0;
 
-        return Row(
-          children: [
-            Expanded(
-              child: _buildStreakItem(
-                context: context,
-                label: 'Current streak',
-                value: currentStreak,
-                iconColor: primaryOrange,
-                icon: Icons.local_fire_department_rounded,
+        return Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: pCardBg,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: Colors.white.withOpacity(0.08)),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: _buildStreakItem(
+                  context: context,
+                  label: 'Current Streak',
+                  value: currentStreak,
+                  iconColor: primaryOrange,
+                  icon: Icons.local_fire_department_rounded,
+                ),
               ),
-            ),
-            SizedBox(width: Responsive.width(context, 0.05)),
-            Expanded(
-              child: _buildStreakItem(
-                context: context,
-                label: 'Best streak',
-                value: bestStreak,
-                iconColor: const Color(0xFF007AFF),
-                icon: Icons.water_drop_rounded,
+              Container(
+                width: 1,
+                height: 40,
+                color: Colors.white.withOpacity(0.1),
               ),
-            ),
-          ],
+              SizedBox(width: 16),
+              Expanded(
+                child: _buildStreakItem(
+                  context: context,
+                  label: 'Best Streak',
+                  value: bestStreak,
+                  iconColor: Colors.white.withOpacity(
+                    0.8,
+                  ), // Neutral white instead of blue
+                  icon: Icons.emoji_events_rounded,
+                ),
+              ),
+            ],
+          ),
         );
       },
     );
@@ -250,46 +264,36 @@ class _ProgressScreenState extends State<ProgressScreen> {
     required Color iconColor,
     required IconData icon,
   }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    return Row(
       children: [
-        Row(
+        Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: iconColor.withOpacity(0.15),
+            shape: BoxShape.circle,
+          ),
+          child: Icon(icon, color: iconColor, size: 24),
+        ),
+        SizedBox(width: 12),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(icon, color: iconColor, size: Responsive.icon(context, 0.05)),
-            SizedBox(width: Responsive.width(context, 0.02)),
+            Text(
+              '$value Days',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
+                color: Colors.white,
+                fontFamily: 'Inter',
+              ),
+            ),
             Text(
               label,
               style: TextStyle(
-                fontSize: Responsive.text(context, 0.035),
+                fontSize: 11,
                 fontWeight: FontWeight.w500,
-                color: Colors.white,
-                fontFamily: 'Inter',
-              ),
-            ),
-          ],
-        ),
-        SizedBox(height: Responsive.height(context, 0.01)),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.baseline,
-          textBaseline: TextBaseline.alphabetic,
-          children: [
-            Text(
-              '$value ',
-              style: TextStyle(
-                fontSize: Responsive.text(context, 0.08),
-                fontWeight: FontWeight.w800,
-                fontFamily: 'Inter',
-                color: Colors.white,
-                letterSpacing: -1.0,
-              ),
-            ),
-            Text(
-              'days',
-              style: TextStyle(
-                fontSize: Responsive.text(context, 0.038),
-                fontWeight: FontWeight.w500,
-                fontFamily: 'Inter',
                 color: Colors.white.withOpacity(0.5),
+                fontFamily: 'Inter',
               ),
             ),
           ],
@@ -325,6 +329,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
                 decoration: BoxDecoration(
                   color: pCardBg,
                   borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: Colors.white.withOpacity(0.08)),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
@@ -371,6 +376,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
               decoration: BoxDecoration(
                 color: pCardBg,
                 borderRadius: BorderRadius.circular(24),
+                border: Border.all(color: Colors.white.withOpacity(0.08)),
               ),
               child: SizedBox(
                 height: 220,
@@ -379,16 +385,16 @@ class _ProgressScreenState extends State<ProgressScreen> {
                     // Y-Axis Labels
                     Column(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                      crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
-                        _buildYLabel('${chartMax} wo'),
-                        _buildYLabel('${(chartMax * 0.75).round()} wo'),
-                        _buildYLabel('${(chartMax * 0.5).round()} wo'),
-                        _buildYLabel('${(chartMax * 0.25).round()} wo'),
-                        _buildYLabel('1 wo'),
+                        _buildYLabel('${chartMax}'),
+                        _buildYLabel('${(chartMax * 0.75).round()}'),
+                        _buildYLabel('${(chartMax * 0.5).round()}'),
+                        _buildYLabel('${(chartMax * 0.25).round()}'),
+                        _buildYLabel('0'),
                       ],
                     ),
-                    const SizedBox(width: 20),
+                    const SizedBox(width: 16),
 
                     // Bars
                     Expanded(
@@ -444,9 +450,10 @@ class _ProgressScreenState extends State<ProgressScreen> {
     return Text(
       text,
       style: TextStyle(
-        fontSize: 11,
+        fontSize: 10,
         color: Colors.white.withOpacity(0.3),
         fontWeight: FontWeight.w500,
+        fontFamily: 'Inter',
       ),
     );
   }
@@ -465,7 +472,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
             children: [
               // Background Track
               Container(
-                width: 12,
+                width: 8,
                 decoration: BoxDecoration(
                   color: Colors.white.withOpacity(0.05),
                   borderRadius: BorderRadius.circular(6),
@@ -477,12 +484,21 @@ class _ProgressScreenState extends State<ProgressScreen> {
                     ? percent
                     : 0.05, // Minimum visual height
                 child: Container(
-                  width: 12,
+                  width: 8,
                   decoration: BoxDecoration(
                     color: isActive
                         ? primaryOrange
                         : Colors.white.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(6),
+                    boxShadow: isActive
+                        ? [
+                            BoxShadow(
+                              color: primaryOrange.withOpacity(0.3),
+                              blurRadius: 8,
+                              offset: const Offset(0, -2),
+                            ),
+                          ]
+                        : null,
                   ),
                 ),
               ),
@@ -493,9 +509,10 @@ class _ProgressScreenState extends State<ProgressScreen> {
         Text(
           label,
           style: TextStyle(
-            fontSize: 11,
+            fontSize: 10,
             color: Colors.white.withOpacity(0.4),
             fontWeight: FontWeight.w500,
+            fontFamily: 'Inter',
           ),
         ),
       ],
@@ -533,15 +550,16 @@ class _ProgressScreenState extends State<ProgressScreen> {
 
       for (var doc in workoutsSnapshot.docs) {
         final data = doc.data();
-        // Use actual workout data
+        // Use actual workout data STRICTLY
         totalMinutes += (data['durationMinutes'] as int?) ?? 0;
         totalCalories += (data['calories'] as int?) ?? 0;
       }
 
+      // STRICT ACCURACY: No estimations.
       return {
         'workouts': totalWorkouts,
-        'minutes': totalMinutes > 0 ? totalMinutes : totalWorkouts * 15,
-        'calories': totalCalories > 0 ? totalCalories : totalWorkouts * 120,
+        'minutes': totalMinutes,
+        'calories': totalCalories,
       };
     } catch (e) {
       return {'workouts': 0, 'minutes': 0, 'calories': 0};

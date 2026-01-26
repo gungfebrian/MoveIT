@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import '../theme/app_theme.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -9,10 +11,10 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  // Theme Colors
-  static const Color pDarkBg = Color(0xFF08080C);
-  static const Color pCardBg = Color(0xFF12121A);
-  static const Color primaryOrange = Color(0xFFFF5C00);
+  // Theme Colors - using AppTheme
+  Color get pDarkBg => AppTheme.background;
+  Color get pCardBg => AppTheme.card;
+  Color get primaryOrange => AppTheme.primary;
 
   bool _notificationsEnabled = true;
   bool _soundEnabled = true;
@@ -58,6 +60,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    _buildSectionHeader('Profile'),
+                    _buildProfileCard(),
+                    const SizedBox(height: 32),
                     _buildSectionHeader('Preferences'),
                     _buildSettingsCard([
                       _buildSwitchTile(
@@ -105,6 +110,132 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  Widget _buildProfileCard() {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return const SizedBox.shrink();
+
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: pCardBg,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: Colors.white.withOpacity(0.05)),
+      ),
+      child: Row(
+        children: [
+          CircleAvatar(
+            radius: 30,
+            backgroundColor: primaryOrange.withOpacity(0.2),
+            backgroundImage: user.photoURL != null
+                ? NetworkImage(user.photoURL!)
+                : null,
+            child: user.photoURL == null
+                ? Text(
+                    user.displayName?.isNotEmpty == true
+                        ? user.displayName![0].toUpperCase()
+                        : 'U',
+                    style: TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                      color: primaryOrange,
+                    ),
+                  )
+                : null,
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        user.displayName ?? 'User',
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(
+                        Icons.edit,
+                        size: 16,
+                        color: Colors.white54,
+                      ),
+                      onPressed: _showEditNameDialog,
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                      splashRadius: 20,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  user.email ?? '',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.white.withOpacity(0.5),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showEditNameDialog() {
+    final user = FirebaseAuth.instance.currentUser;
+    final controller = TextEditingController(text: user?.displayName);
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF14141C),
+        title: const Text('Edit Name', style: TextStyle(color: Colors.white)),
+        content: TextField(
+          controller: controller,
+          style: const TextStyle(color: Colors.white),
+          decoration: InputDecoration(
+            hintText: 'Enter your name',
+            hintStyle: TextStyle(color: Colors.white.withOpacity(0.3)),
+            enabledBorder: UnderlineInputBorder(
+              borderSide: BorderSide(color: Colors.white.withOpacity(0.3)),
+            ),
+            focusedBorder: UnderlineInputBorder(
+              borderSide: BorderSide(color: primaryOrange),
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(
+              'Cancel',
+              style: TextStyle(color: Colors.white.withOpacity(0.5)),
+            ),
+          ),
+          TextButton(
+            onPressed: () async {
+              if (controller.text.isNotEmpty) {
+                await user?.updateDisplayName(controller.text);
+                await user?.reload();
+                if (mounted) setState(() {});
+                Navigator.pop(context);
+              }
+            },
+            child: Text('Save', style: TextStyle(color: primaryOrange)),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildHeader() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
@@ -114,10 +245,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             onTap: () => Navigator.pop(context),
             child: Container(
               padding: const EdgeInsets.all(10),
-              decoration: const BoxDecoration(
-                color: pCardBg,
-                shape: BoxShape.circle,
-              ),
+              decoration: BoxDecoration(color: pCardBg, shape: BoxShape.circle),
               child: const Icon(
                 Icons.arrow_back,
                 color: Colors.white,
