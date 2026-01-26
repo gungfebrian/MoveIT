@@ -4,12 +4,12 @@ AI-powered fitness tracking app with real-time pose detection for counting exerc
 
 ## Features
 
-- 📷 **Real-time Pose Detection** - Uses Google ML Kit for accurate body tracking
-- 🔄 **Rep Counter** - Automatically counts your exercise repetitions
-- 🔥 **Streak Tracking** - Keep your workout consistency
-- 🎯 **Goal Setting** - Set and track your fitness goals
-- 🔐 **Firebase Auth** - Secure login with Google Sign-In
-- ☁️ **Cloud Sync** - Your data synced across devices with Firestore
+- **Real-time Pose Detection** - Uses Google ML Kit for accurate body tracking
+- **Rep Counter** - Automatically counts your exercise repetitions
+- **Streak Tracking** - Keep your workout consistency
+- **Goal Setting** - Set and track your fitness goals
+- **Firebase Auth** - Secure login with Google Sign-In
+- **Cloud Sync** - Your data synced across devices with Firestore
 
 ## Tech Stack
 
