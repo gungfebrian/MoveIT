@@ -47,5 +47,18 @@
 	<true/>
 	<key>NSCameraUsageDescription</key>
     <string>This app needs camera access to detect pull-ups.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>This app needs microphone access for audio feedback.</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>com.googleusercontent.apps.3304106632-072ufbdg2pmcjuok5odda3sp8cgkntn2</string>
+			</array>
+		</dict>
+	</array>
 </dict>
 </plist>

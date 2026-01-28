@@ -726,11 +726,18 @@ class _ProfileTabState extends State<ProfileTab> {
   }
 
   Widget _buildLogoutButton(BuildContext context) {
+    final user = FirebaseAuth.instance.currentUser;
+    final isLoggedIn = user != null;
+
     return SizedBox(
       width: double.infinity,
       child: TextButton(
         onPressed: () async {
-          await AuthService().signOut();
+          if (isLoggedIn) {
+            // User is logged in - sign out
+            await AuthService().signOut();
+          }
+          // Navigate to login page
           if (mounted) {
             Navigator.pushAndRemoveUntil(
               context,
@@ -746,15 +753,28 @@ class _ProfileTabState extends State<ProfileTab> {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(20),
           ),
-          backgroundColor: const Color(0xFF2A1215), // Dark Red
+          backgroundColor: isLoggedIn
+              ? const Color(0xFF2A1215) // Dark Red for logout
+              : primaryOrange.withOpacity(0.15), // Orange tint for login
         ),
-        child: Text(
-          'Log Out',
-          style: TextStyle(
-            color: primaryOrange,
-            fontSize: Responsive.text(context, 0.04),
-            fontWeight: FontWeight.w700,
-          ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              isLoggedIn ? Icons.logout_rounded : Icons.login_rounded,
+              color: primaryOrange,
+              size: Responsive.icon(context, 0.05),
+            ),
+            SizedBox(width: Responsive.width(context, 0.02)),
+            Text(
+              isLoggedIn ? 'Log Out' : 'Login here',
+              style: TextStyle(
+                color: primaryOrange,
+                fontSize: Responsive.text(context, 0.04),
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
         ),
       ),
     );

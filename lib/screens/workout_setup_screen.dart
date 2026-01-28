@@ -33,6 +33,7 @@ class _WorkoutSetupScreenState extends State<WorkoutSetupScreen> {
 
   void _startWorkout() {
     // Use unified CameraScreen for all exercise types
+    // Pass target reps if in target mode, otherwise null for freeform
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -40,6 +41,7 @@ class _WorkoutSetupScreenState extends State<WorkoutSetupScreen> {
           camera: widget.camera,
           cameras: widget.cameras,
           exerciseType: _selectedExercise,
+          targetReps: _goalType == 'reps' ? _targetReps : null,
         ),
       ),
     );
@@ -274,13 +276,16 @@ class _WorkoutSetupScreenState extends State<WorkoutSetupScreen> {
 
   Widget _buildExerciseCard(String exercise) {
     final isSelected = _selectedExercise == exercise;
-    IconData icon;
-    if (exercise == 'Pull-Up')
-      icon = Icons.fitness_center;
-    else if (exercise == 'Push-Up')
-      icon = Icons.accessibility_new;
-    else
-      icon = Icons.self_improvement; // Sit-Up icon (person sitting)
+
+    // Map exercise to image asset
+    String imagePath;
+    if (exercise == 'Pull-Up') {
+      imagePath = 'assets/images/pullup.png';
+    } else if (exercise == 'Push-Up') {
+      imagePath = 'assets/images/pushup.png';
+    } else {
+      imagePath = 'assets/images/situp.png';
+    }
 
     return GestureDetector(
       onTap: () => setState(() => _selectedExercise = exercise),
@@ -297,10 +302,11 @@ class _WorkoutSetupScreenState extends State<WorkoutSetupScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              icon,
+            Image.asset(
+              imagePath,
+              width: 40,
+              height: 40,
               color: isSelected ? Colors.white : Colors.white.withOpacity(0.5),
-              size: 32,
             ),
             const SizedBox(height: 8),
             Text(

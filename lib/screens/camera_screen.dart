@@ -17,12 +17,14 @@ class CameraScreen extends StatefulWidget {
   final CameraDescription camera;
   final List<CameraDescription> cameras;
   final String exerciseType;
+  final int? targetReps; // null = freeform/open goal mode
 
   const CameraScreen({
     super.key,
     required this.camera,
     required this.cameras,
     this.exerciseType = 'Pull-Up',
+    this.targetReps,
   });
 
   @override
@@ -231,6 +233,9 @@ class _CameraScreenState extends State<CameraScreen>
   int _prevRepCount = 0;
   double _prevQuality = 0.0;
   bool _prevProperForm = false;
+
+  // Track if target has been completed (to show dialog only once)
+  bool _hasCompletedTarget = false;
 
   @override
   void initState() {
@@ -541,6 +546,17 @@ class _CameraScreenState extends State<CameraScreen>
       _audioService.announceRep(newRepCount);
     }
 
+    // Check if target reached (only in target mode, not freeform)
+    if (widget.targetReps != null &&
+        newRepCount >= widget.targetReps! &&
+        !_hasCompletedTarget) {
+      _hasCompletedTarget = true;
+      // Show completion dialog after a short delay to let the last rep register
+      Future.delayed(const Duration(milliseconds: 500), () {
+        if (mounted) _showCompletionDialog();
+      });
+    }
+
     if (newFeedback != _prevFeedback ||
         newRepCount != _prevRepCount ||
         newQuality != _prevQuality ||
@@ -552,6 +568,77 @@ class _CameraScreenState extends State<CameraScreen>
         _prevProperForm = newProperForm;
       });
     }
+  }
+
+  /// Show congratulation dialog when target is reached
+  void _showCompletionDialog() async {
+    // Stop processing to freeze the camera
+    _isProcessing = true;
+
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1A1F2E),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: const Color(0xFF4CAF50).withOpacity(0.2),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.emoji_events_rounded,
+                color: Color(0xFFFFD700),
+                size: 60,
+              ),
+            ),
+            const SizedBox(height: 24),
+            const Text(
+              '🎉 Goal Reached!',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 24,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'You completed ${widget.targetReps} ${_workoutLogic.exerciseName}s!',
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: Colors.white70, fontSize: 16),
+            ),
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () async {
+                  Navigator.of(ctx).pop();
+                  await _saveSessionToHistory();
+                  if (mounted) Navigator.of(context).pop();
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF4CAF50),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                ),
+                child: const Text(
+                  'Finish Workout',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   /// Called when countdown completes
@@ -637,6 +724,19 @@ class _CameraScreenState extends State<CameraScreen>
     if (quality < 0.6) return Colors.orange;
     if (quality < 0.8) return Colors.yellow;
     return Colors.green;
+  }
+
+  String _getExerciseImagePath() {
+    switch (widget.exerciseType.toLowerCase()) {
+      case 'pull-up':
+        return 'assets/images/pullup.png';
+      case 'push-up':
+        return 'assets/images/pushup.png';
+      case 'sit-up':
+        return 'assets/images/situp.png';
+      default:
+        return 'assets/images/pullup.png';
+    }
   }
 
   @override
@@ -732,16 +832,17 @@ class _CameraScreenState extends State<CameraScreen>
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(
-                              _workoutLogic.icon,
-                              color: themeColor,
-                              size: 28,
+                            Image.asset(
+                              _getExerciseImagePath(),
+                              width: 28,
+                              height: 28,
+                              color: const Color(0xFFF97316),
                             ),
                             const SizedBox(width: 12),
                             Text(
                               '${_workoutLogic.repCount}',
                               style: const TextStyle(
-                                color: Colors.white,
+                                color: Color(0xFFF97316),
                                 fontSize: 40,
                                 fontWeight: FontWeight.w900,
                                 letterSpacing: -1,
@@ -888,7 +989,7 @@ class _CameraScreenState extends State<CameraScreen>
                     borderRadius: BorderRadius.circular(16),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.red.withOpacity(0.3),
+                        color: const Color(0xFFF97316).withOpacity(0.3),
                         blurRadius: 20,
                         spreadRadius: 2,
                       ),
@@ -929,7 +1030,7 @@ class _CameraScreenState extends State<CameraScreen>
                                 ElevatedButton(
                                   onPressed: () => Navigator.of(ctx).pop(true),
                                   style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.red,
+                                    backgroundColor: const Color(0xFFF97316),
                                     foregroundColor: Colors.white,
                                     shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(12),
@@ -955,7 +1056,7 @@ class _CameraScreenState extends State<CameraScreen>
                       }
                     },
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFD32F2F),
+                      backgroundColor: const Color(0xFFF97316),
                       foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(
                         horizontal: 40,
