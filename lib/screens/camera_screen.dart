@@ -462,8 +462,12 @@ class _CameraScreenState extends State<CameraScreen>
 
   Future<void> _processImage(CameraImage image) async {
     // Safety check: stop if already processing, disposed, or countdown not complete
-    if (_isProcessing || !mounted || _isCameraDisposed || !_isCountdownComplete)
+    if (_isProcessing ||
+        !mounted ||
+        _isCameraDisposed ||
+        !_isCountdownComplete) {
       return;
+    }
 
     // TIME-BASED THROTTLING: Process only if enough time has passed
     // This ensures consistent 10 FPS regardless of device camera speed

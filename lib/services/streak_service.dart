@@ -3,6 +3,7 @@
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 
 class StreakService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -165,7 +166,7 @@ class StreakService {
 
       return {'currentStreak': currentStreak, 'bestStreak': bestStreak};
     } catch (e) {
-      print('Error calculating streak: $e');
+      debugPrint('Error calculating streak: $e');
       return {'currentStreak': 0, 'bestStreak': 0};
     }
   }

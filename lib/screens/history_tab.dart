@@ -37,16 +37,13 @@ class _HistoryTabState extends State<HistoryTab> {
         totalMinutes += (data['durationMinutes'] as int?) ?? 0;
       }
 
-      // STRICT ACCURACY: No estimations.
-      // If data is 0, it stays 0.
-
       return {
         'totalCalories': totalCalories,
         'totalMinutes': totalMinutes,
         'totalSessions': totalSessions,
       };
     } catch (e) {
-      print('Error fetching user stats: $e');
+      debugPrint('Error fetching user stats: $e');
       return {'totalCalories': 0, 'totalMinutes': 0, 'totalSessions': 0};
     }
   }

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 import 'dart:math' as math;
 
@@ -279,10 +278,11 @@ class SitUpLogic extends WorkoutLogic {
       _isProperForm = true;
     } else {
       // In motion
-      if (_state == 0)
+      if (_state == 0) {
         _feedback = "Up...";
-      else
+      } else {
         _feedback = "Down...";
+      }
     }
   }
 }
@@ -393,10 +393,11 @@ class PullUpLogic extends WorkoutLogic {
       _isProperForm = true;
     } else {
       // Motion
-      if (_state == 0)
+      if (_state == 0) {
         _feedback = "Higher...";
-      else
+      } else {
         _feedback = "Lower...";
+      }
     }
   }
 }
